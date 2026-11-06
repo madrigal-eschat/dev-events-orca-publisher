@@ -64,7 +64,8 @@ publisher (`MqttPublisherService.kt`, `PluginSettings.kt`) before starting.
 - `subject`: project/worktree root, home-relative (`~/...`), omitted or masked
   according to settings.
 - Topic: `{topicPrefix}/{hostname}` when "include host" is on (default prefix
-  `ide-events`, as in the JetBrains plugin).
+  `dev-events`, as in the JetBrains plugin; the old
+  prefix name from before the rename must not appear anywhere).
 - Fire-and-forget, QoS 0, never block Orca's UI or an agent on publish.
 - Optional fields are omitted entirely, never null (spec rule).
 
@@ -112,7 +113,7 @@ together with the first release of this publisher.
   If it does not, do not store the password at all: read it at connect time
   from a file path the user configures (not an environment variable). Do not
   invent your own encryption. Document the chosen mechanism in the README.
-- Topic prefix (default `ide-events`), include-host toggle, host label.
+- Topic prefix (default `dev-events`), include-host toggle, host label.
 - Home subnet (CIDR): publish only when a local IPv4 address matches; blank
   means always publish.
 - Per-event mode: OFF / REDACTED / FULL. Events without sensitive fields
