@@ -164,9 +164,9 @@ CI workflows call the shared reusable workflows in
   `_prose-lint.yml`, `_semrel.yml`.
 - **missing, add them to `ci-workflows` (separate PR there, new minor release)
   and consume them here:**
-  - `_node-ci.yml`: install with lockfile, lint, typecheck, unit tests
-    (`orca plugin test` or the test runner the template uses),
-    `orca plugin validate`.
+  - `_node-ci.yml`: generic Node/TypeScript CI only: install with lockfile,
+    lint, typecheck, and the project's own test script (`npm test`). Nothing
+    Orca-specific belongs in `ci-workflows`.
   - `_node-coverage.yml`: diff coverage gate at 100% like the existing
     `_kotlin-coverage.yml` and `_rust-coverage.yml` (diff-cover against the
     base branch).
