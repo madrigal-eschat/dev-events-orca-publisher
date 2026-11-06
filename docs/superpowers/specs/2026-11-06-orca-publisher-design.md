@@ -162,6 +162,12 @@ CI workflows call the shared reusable workflows in
 
 - existing and reusable as is: `_commitlint.yml`, `_markdown-lint.yml`,
   `_prose-lint.yml`, `_semrel.yml`.
+- **this repo's own workflow** (`.github/workflows/ci.yml`) additionally runs
+  the Orca-specific checks as a local job: `orca plugin validate` (and
+  `orca plugin check` / `orca plugin test` if they can run headless).
+  **[builder]**: work out how to obtain the Orca CLI in CI (is it published,
+  can it run without the desktop app?). If it cannot run in CI, say so, keep
+  `npm test` as the gate, and document running them locally.
 - **missing, add them to `ci-workflows` (separate PR there, new minor release)
   and consume them here:**
   - `_node-ci.yml`: generic Node/TypeScript CI only: install with lockfile,
