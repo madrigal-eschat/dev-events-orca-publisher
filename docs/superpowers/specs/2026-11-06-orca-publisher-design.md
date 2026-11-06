@@ -110,8 +110,7 @@ together with the first release of this publisher.
   **[decided]** The password is never written to plain plugin settings, plugin
   storage or logs. If Orca's plugin API offers a real secret store, use it.
   If it does not, do not store the password at all: read it at connect time
-  from an environment variable (name configurable, default
-  `DEV_EVENTS_MQTT_PASSWORD`) or from a file path the user configures. Do not
+  from a file path the user configures (not an environment variable). Do not
   invent your own encryption. Document the chosen mechanism in the README.
 - Topic prefix (default `ide-events`), include-host toggle, host label.
 - Home subnet (CIDR): publish only when a local IPv4 address matches; blank
