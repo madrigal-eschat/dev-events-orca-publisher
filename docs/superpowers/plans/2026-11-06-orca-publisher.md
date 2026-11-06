@@ -71,7 +71,7 @@ Establish whether the worker exposes a true secret store, a configurable-file re
 
 - [ ] **Step 5: Resolve design contradictions and write the gate result**
 
-Record a PASS only if the worker itself can establish MQTT connectivity and publish without blocking Orca. Record any unknown API details as explicit implementation constraints. Also flag the topic-prefix default conflict: the approved design says `ide-events`, but the inspected JetBrains `PluginSettings.State` default is `dev-events`; obtain the owner's decision before implementing settings.
+Record a PASS only if the worker itself can establish MQTT connectivity and publish without blocking Orca. Record any unknown API details as explicit implementation constraints. The topic-prefix default is settled: `dev-events` (the pre-rename prefix must not appear anywhere in this repo).
 
 - [ ] **Step 6: Enforce the go/no-go**
 
@@ -169,7 +169,7 @@ Add tests that assert the JetBrains defaults for broker URL (`tcp://localhost:18
 
 - [ ] **Step 2: Implement the settings model**
 
-Persist broker URL, username, client ID, topic prefix, include-host, host label, home subnet, project-subject mode, and event modes. Resolve the default prefix only after the owner has decided between the approved design's `ide-events` and JetBrains source's `dev-events`. Provide password retrieval from the Orca secret store when available, otherwise read only from the user-configured file path at connect time.
+Persist broker URL, username, client ID, topic prefix, include-host, host label, home subnet, project-subject mode, and event modes. The default prefix is `dev-events` (owner decision; the pre-rename prefix is retired). Provide password retrieval from the Orca secret store when available, otherwise read only from the user-configured file path at connect time.
 
 - [ ] **Step 3: Test safe payload construction**
 
@@ -328,7 +328,7 @@ Commit documentation changes with `docs: document Orca publisher setup and event
 ## Self-review against the approved design
 
 - **Spec coverage:** The plan covers the hard MQTT feasibility gate; observed-event mapping and unsupported list; dev-events 1.1 agent contract; CloudEvents envelope, source, subject, topic and QoS 0; privacy-safe settings and credentials; subnet gating; status/logs; plugin capabilities; unit, contract, integration, and diff coverage tests; all required repo metadata; reusable Node/coverage/gitleaks workflows; release workflow and manual catalog entry; and owner/PA responsibility for repository hosting/mirroring.
-- **Unresolved design conflict:** Topic-prefix default differs between the approved design (`ide-events`) and JetBrains implementation (`dev-events`). Task 1 makes owner resolution a hard prerequisite for settings tests and implementation; the plan does not choose on the owner's behalf.
+- **Resolved:** Topic-prefix default is `dev-events` (owner decision, 2026-11-06). The pre-rename prefix is retired and must not appear anywhere.
 - **No-go behavior:** If worker-side MQTT fails, Task 1 explicitly stops all follow-on implementation and requires an owner decision before any companion process.
 - **Placeholder scan:** No implementation steps rely on TODO/TBD or unspecified future behavior. API-specific event names and field shapes are intentionally determined from the discovery artifact before the dependent mapping and event-contract work.
 - **Type consistency:** Mapped event types/data flow through `mapping.ts` and `payload.ts`, then `envelope.ts` and `publisher.ts`; status uses publisher state/errors and never event contents. The same final discovered subset is used by protocol, tests, and README.
