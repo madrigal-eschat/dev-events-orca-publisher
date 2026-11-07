@@ -1,0 +1,13 @@
+{
+  "manifestVersion": 2,
+  "id": "dev-events-orca-publisher",
+  "name": "dev-events Orca Publisher",
+  "version": "0.1.0",
+  "description": "Scaffold for the dev-events Orca publisher.",
+  "engines": {
+    "orca": ">=1.4.248"
+  },
+  "execution": "trusted-worker",
+  "pluginApi": 1,
+  "main": "src/worker.ts"
+}
