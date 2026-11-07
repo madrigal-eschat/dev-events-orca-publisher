@@ -212,11 +212,13 @@ CI workflows call the shared reusable workflows in
 - **missing, add them to `ci-workflows` (separate PR there, new minor release)
   and consume them here:**
   - `_node-ci.yml`: generic Node/TypeScript CI only: install with lockfile,
-    lint, typecheck, and the project's own test script (`npm test`). Nothing
-    Orca-specific belongs in `ci-workflows`.
-  - `_node-coverage.yml`: diff coverage gate at 100% like the existing
-    `_kotlin-coverage.yml` and `_rust-coverage.yml` (diff-cover against the
-    base branch).
+    lint, typecheck, and the project's own test script
+    (`npm test -- --coverage`), plus a 100% diff coverage gate against the
+    base branch (diff-cover, on by default), like the existing
+    `_kotlin-coverage.yml` and `_rust-coverage.yml`. There is no separate
+    Node coverage workflow. Nothing Orca-specific belongs in `ci-workflows`;
+    the adapter/UI coverage exclusion list lives in this repo's coverage
+    config, documented and reviewed.
   - `_gitleaks.yml`: gitleaks over the full history on pull requests and
     pushes, fails the build on findings. madrigal-eschat has no gitleaks
     anywhere yet; once the reusable workflow exists, also record in the
@@ -255,8 +257,8 @@ CI workflows call the shared reusable workflows in
    `madrigal-eschat/dev-events-mqtt#4`. The builder may open PRs against
    `ci-workflows`; the owner reviews and merges them, and creates the GitHub
    repository and the GitLab mirror.
-3. Add `_node-ci`, `_node-coverage` and `_gitleaks` to `ci-workflows` (PR,
-   owner merges and releases). While that PR is in review, this repo may
+3. Add `_node-ci` (with diff coverage) and `_gitleaks` to `ci-workflows` (PR
+   `ci-workflows#1`, under review; owner merges and releases). While that PR is in review, this repo may
    reference the workflows by branch; the pin must be a released commit SHA
    before this repo's own CI PR merges.
 4. Build the plugin with tests, then integration test, then docs and release.
@@ -304,6 +306,6 @@ API offers one.
 3. A visible connection/last-error status surface (logs required, panel if
    Orca offers one).
 4. GitHub primary with GitLab mirror (matching the other madrigal-eschat repos).
-5. Adding `_node-ci`, `_node-coverage` and `_gitleaks` to `ci-workflows` as
+5. Adding `_node-ci` (with diff coverage) and `_gitleaks` to `ci-workflows` as
    part of this work, rather than inline workflows in this repo.
 6. Apache-2.0 licence, catalog publishing left manual.

@@ -21,8 +21,7 @@ The spike establishes the Orca CLI version, generated entry-point shape, compati
 - Modify: `MESSAGE-FORMAT.md` — version 1.1 note and final agent lifecycle event types/fields supported by Orca discovery.
 
 **External CI prerequisite (`ci-workflows`)**
-- Create: `.github/workflows/_node-ci.yml` — lockfile install, lint, typecheck, and `npm test`.
-- Create: `.github/workflows/_node-coverage.yml` — 100% diff coverage gate against the base branch.
+- Create: `.github/workflows/_node-ci.yml` — lockfile install, lint, typecheck, `npm test -- --coverage`, and the 100% diff coverage gate against the base branch (diff coverage on by default).
 - Create: `.github/workflows/_gitleaks.yml` — full-history gitleaks on pull requests and pushes.
 - Modify: `README.md` — document the reusable gitleaks workflow and recommendation to adopt it.
 
@@ -97,33 +96,30 @@ The Orca-specific mapping onto this contract lives in the design spec ("Mapping 
 
 Owner not yet decided. The 1.1 contract defines `devevents.agent.started` and `devevents.agent.exited`, but the Task 1 discovery found no clean Orca signal for either: `agent.launch.before` is pre-launch (it does not prove a launch succeeded and its `command` may contain a prompt), and the workspace and terminal events give no session start or end. Until a throwaway spike, run like Task 1 and recorded in the discovery note, proves a reliable signal that needs no prompt or output access, the publisher does not emit these two types and no document may claim that Orca does. This task does not block the first release (see the design spec, "Order of work").
 
-## Task 3: Add reusable Node, coverage, and gitleaks workflows
+## Task 3: Add reusable Node CI (with diff coverage) and gitleaks workflows
+
+**Status:** DONE locally and under review in [`ci-workflows` PR #1](https://github.com/madrigal-eschat/ci-workflows/pull/1). Remaining: owner review, merge, and release (Step 5).
 
 **Files:**
 - Create in `ci-workflows`: `.github/workflows/_node-ci.yml`
-- Create in `ci-workflows`: `.github/workflows/_node-coverage.yml`
 - Create in `ci-workflows`: `.github/workflows/_gitleaks.yml`
 - Modify in `ci-workflows`: `README.md`
 
-- [ ] **Step 1: Implement the generic Node CI workflow**
+- [x] **Step 1: Implement the generic Node CI workflow with diff coverage**
 
-Create `_node-ci.yml` as a reusable workflow that checks out the caller's code, installs the Node version from the caller's pin and dependencies with its lockfile, then runs the caller's `lint`, `typecheck`, and `test` scripts. Keep Orca CLI checks out of this generic workflow.
+Create `_node-ci.yml` as a reusable workflow that checks out the caller's code, installs the Node version from the caller's pin and dependencies with its lockfile, then runs the caller's `lint`, `typecheck`, and `test` scripts (`npm test -- --coverage`, expecting `coverage/lcov.info`). It then fails the pull request if changed executable lines are below 100% coverage against the base branch; diff coverage is on by default. Keep Orca CLI checks out of this generic workflow. The Orca adapter/UI exclusion list lives in the publisher repository's coverage config (see Task 4), not in `ci-workflows`.
 
-- [ ] **Step 2: Implement the 100% diff coverage workflow**
-
-Create `_node-coverage.yml` to compare pull-request changes with the base branch and fail if changed executable lines are below 100% coverage. Exclude only the thin Orca adapter/UI boundary after documenting and reviewing the exact exclusion list in the publisher repository; do not use broad directory or file exclusions.
-
-- [ ] **Step 3: Implement full-history gitleaks**
+- [x] **Step 2: Implement full-history gitleaks**
 
 Create `_gitleaks.yml` for both pull requests and pushes, with full Git history available to the scanner and findings failing the job. Do not add ignore entries for secrets in HEAD.
 
-- [ ] **Step 4: Document adoption and validate workflow composition**
+- [x] **Step 3: Document adoption and validate workflow composition**
 
 Update the `ci-workflows` README to recommend `_gitleaks.yml` adoption by other repositories without expanding this publisher task to change those repositories. Run the existing workflow validation/checks in `ci-workflows`, and open the required PR. Record its URL and use a branch reference only while the reusable workflow PR is under review.
 
-- [ ] **Step 5: Release and record the pinned commit**
+- [ ] **Step 4: Release and record the pinned commit**
 
-After owner review and merge, follow the `ci-workflows` release process. Record the released commit SHA and version for all three new workflows; the publisher's CI PR must pin that SHA, with a matching version comment, before merge.
+After owner review and merge, follow the `ci-workflows` release process. Record the released commit SHA and version, and pin that commit for both new workflows (`_node-ci.yml` and `_gitleaks.yml`); the publisher's CI PR must pin that SHA, with a matching version comment, before merge.
 
 ## Task 4: Scaffold the Orca plugin and repository baseline
 
@@ -139,7 +135,7 @@ Generate the plugin from the discovery-approved Orca template in the repository.
 
 - [ ] **Step 2: Add npm scripts and pinned toolchain**
 
-Add a lockfile-backed `package.json` with `lint`, `typecheck`, `test`, `orca:validate`, `orca:check`, and `orca:test` scripts. Set `test` to `vitest run`; pin the verified Node major using `.nvmrc`; use Biome for lint/format and TypeScript for typechecking. Add Vitest and a smoke test for the scaffold. Ensure the Node CI workflow's expected script names are present.
+Add a lockfile-backed `package.json` with `lint`, `typecheck`, `test`, `orca:validate`, `orca:check`, and `orca:test` scripts. Set `test` to `vitest run`, and make it accept `-- --coverage` (add `@vitest/coverage-v8`; lcov reporter writing `coverage/lcov.info`). The adapter/UI exclusion list lives in the coverage config and is documented and reviewed; use no broad directory or file exclusions. pin the verified Node major using `.nvmrc`; use Biome for lint/format and TypeScript for typechecking. Add Vitest and a smoke test for the scaffold. Ensure the Node CI workflow's expected script names are present.
 
 - [ ] **Step 3: Configure repo metadata following local conventions**
 
@@ -279,7 +275,7 @@ Run the focused status tests and `scripts/integration-test.sh`. Expected: test s
 
 - [ ] **Step 1: Add CI using released reusable workflow SHAs**
 
-Configure `.github/workflows/ci.yml` to call `_node-ci.yml`, `_node-coverage.yml`, `_gitleaks.yml`, `_commitlint.yml`, `_markdown-lint.yml`, `_prose-lint.yml`, and `_semrel.yml` from `madrigal-eschat/ci-workflows`, each pinned to the released commit SHA with its version comment. Use branch references only while waiting for the reusable workflow release; replace all before opening the publisher CI PR for merge.
+Configure `.github/workflows/ci.yml` to call `_node-ci.yml` (diff coverage on by default), `_gitleaks.yml`, `_commitlint.yml`, `_markdown-lint.yml`, `_prose-lint.yml`, and `_semrel.yml` from `madrigal-eschat/ci-workflows`, each pinned to the released commit SHA with its version comment. Use branch references only while waiting for the reusable workflow release; replace all before opening the publisher CI PR for merge.
 
 - [ ] **Step 2: Add only headless Orca checks to CI**
 
