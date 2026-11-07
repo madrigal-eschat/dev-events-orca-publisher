@@ -314,7 +314,7 @@ Document the exact local commands `orca plugin validate`, `orca plugin test`, `o
 
 - [ ] **Step 3: Review release prerequisites**
 
-Confirm the Task 2 protocol PR is merged, all CI workflow references are released SHA pins, first-release agent lifecycle events are supported, and contract, unit, integration, and 100% diff coverage gates pass. If any gate is not met, do not release.
+Confirm the dev-events 1.1 contract (Task 2, merged) is still the version this plugin targets, all CI workflow references are released SHA pins, first-release agent turn events (`turn.started`, `turn.ended`) are supported, and contract, unit, integration, and 100% diff coverage gates pass. If any gate is not met, do not release.
 
 - [ ] **Step 4: Prepare the release**
 
