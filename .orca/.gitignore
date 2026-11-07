@@ -1,0 +1,6 @@
+*
+!.gitignore
+!types/
+types/*
+!types/*.d.ts
+!types/README.md
