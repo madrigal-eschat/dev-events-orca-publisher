@@ -94,6 +94,14 @@ saved, editor focus gained/lost, VCS commit/push, or task/test lifecycle.
 `workspace.changed` exposes a branch value, but not a commit or push event.
 Do not infer unsupported events from terminal text.
 
+### Mapping to dev-events 1.1
+
+How these Orca states map onto the dev-events 1.1 agent events (turn
+start/end reasons, the open `unconfirmed` outcome question, and why
+`devevents.agent.started`/`devevents.agent.exited` are not yet derivable) is
+in the design spec, section "Mapping from Orca":
+`docs/superpowers/specs/2026-11-06-orca-publisher-design.md`.
+
 ## Capabilities and platform surfaces
 
 - Worker event subscriptions require the `main` entry point,
