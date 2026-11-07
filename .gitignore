@@ -1,0 +1,8 @@
+node_modules/
+coverage/
+dist/
+.orca/*
+!.orca/types/
+.orca/types/*
+!.orca/types/*.d.ts
+!.orca/types/README.md
