@@ -2,13 +2,14 @@
 
 ## Gate result
 
-**NO-GO (not proven).** The installed Orca build has a trusted-worker runtime,
-but this spike did not establish an MQTT connection and publish from that
-runtime. A PASS requires that exact evidence. This does not prove that MQTT is
-impossible; it means no plugin implementation, protocol/CI change, or
-companion process is authorized by this result. The worker-side test needs a
-development plugin loaded into the live Orca host with its requested access
-approved. That load was not performed.
+**GO (Task 1 feasibility passed).** After the owner approved the trusted-worker
+grant in Orca, the live worker connected to the loopback Mosquitto broker and
+published a QoS 0 message; the broker log confirmed receipt on `orca/discovery`.
+The worker also completed an encrypted-secret round-trip, obtained IPv4
+interface metadata, and updated a visible status-bar item. MQTT.js ran
+asynchronously in Orca's separate Node worker and the desktop remained
+responsive during the request. UI approval was required and obtained. Task 2
+was not started, per the user's scope instruction.
 
 The topic-prefix default is settled as `dev-events`.
 
@@ -36,6 +37,23 @@ The topic-prefix default is settled as `dev-events`.
   The CLI documents this as running tests unsandboxed in a local Node process;
   it does not reach the Orca app and is not evidence of a live worker
   connection.
+- Orca's official v1.4.251 declarations were retrieved from the nine requested
+  raw source URLs and placed in the throwaway plugin's `.orca/types/`; no
+  replacement API declarations were authored. The matching MIT `LICENSE` was
+  also included after approval. Nothing from these files was added to the
+  repository.
+- One MQTT client was installed only in the throwaway directory:
+  `mqtt@5.16.1`. The plugin validated after moving its root under that
+  directory so Node could resolve the parent `node_modules` without Orca
+  rejecting npm's `.bin` symlinks.
+- `orca plugin validate .../plugin --json` → valid trusted-worker. `orca plugin
+  inspect .../plugin --json` reports `trusted-worker`, the `secrets:own`
+  capability, and a status-bar item.
+- `orca plugin dev load .../plugin --json` → `approval_required`. The returned
+  grant was trusted-worker execution, `secrets:own`, and the status-bar item.
+  UI approval was needed; after the owner approved this exact grant, the
+  returned fingerprint was accepted by `--approve` and the plugin ran as a
+  development plugin. It was unloaded after the live test.
 
 ## Observable events and agent states
 
@@ -85,34 +103,47 @@ Do not infer unsupported events from terminal text.
 - The worker host API has plugin-private storage/settings and an encrypted
   secret store (`secrets.get/set/delete`, `secrets:own`). `secrets.protection`
   reports `os-keyring` or `unavailable`; writes fail when protection is
-  unavailable. Runtime availability was not tested.
-- `orca.log()` and `orca plugin logs` provide a log/status surface. Orca also
-  supports declarative status-bar items and worker `statusBar.update` on this
-  installed version (since 1.4.248); a status bar item has no capability
-  requirement. The `worker-panel` template is also available.
-- The worker API reference has no local-IPv4 method. Whether Node network
-  interfaces are usable in this worker was not tested.
+  unavailable. In the approved live worker, `secrets.protection` returned
+  `os-keyring`; set/get/delete and post-delete absence checks completed
+  successfully. The temporary value was not logged.
+- There is no worker host API for reading a configurable file. The frame API's
+  `files.saveAs` is a user-gesture save dialog, not a file-read facility.
+- `orca.log()` and `orca plugin logs` provide a log/status surface. Orca 1.4.251
+  supports declarative status-bar items and worker `statusBar.update`; the
+  status-bar item needs no additional capability. A live `orca plugin shot
+  --status-bar` had no render errors and showed `MQTT: published`.
+- The worker host API has no local-IPv4 method. The prepared worker checks
+  Node's `os.networkInterfaces()` and logs only counts. The live worker found
+  one non-internal IPv4 interface, classified as private; the address itself
+  was not logged.
 - Orca describes `trusted-worker` as a separate Node.js process on the Orca
   host with the user's account access. No MQTT/network-specific host API or
-  capability was found. The exact approved access needed for the test was not
-  established.
+  capability was found. Orca's requested grant for the prepared experiment
+  was trusted-worker execution plus `secrets:own`.
 
 ## MQTT experiment and remaining constraints
 
-- `mosquitto --version` → local Mosquitto `2.1.2` is installed. No broker was
-  started.
-- No MQTT client library was selected or installed, and no broker URL,
-  transport, QoS 0 publish, or asynchronous behavior was tested from an Orca
-  worker.
-- The generated hook's unit test runs under the local Node test runner; it
-  cannot substitute for a live worker-to-broker test. A request to load the
-  temporary plugin into live Orca was denied because it would install into
-  the live host and requires a user decision. No worker code was loaded or
-  run in Orca.
-- Implementation constraint: preserve the generated `src/worker.ts` entry
-  pattern, but first resolve the missing official typings through an Orca
-  update or official typings source. Do not hand-write replacement API types.
-- The strict gate remains NO-GO until the owner authorizes a live
-  trusted-worker test and that worker demonstrably publishes to the local
-  broker without blocking Orca. No companion process or follow-on task was
-  started.
+- `mqtt@5.16.1` was selected and installed; the worker publisher uses
+  `mqtt://127.0.0.1:1883`, QoS 0, and callback-based async completion. This was
+  executed from the live trusted worker through `orca plugin dev request`.
+- Docker Compose started `eclipse-mosquitto:2.0.22`; `docker compose config`
+  confirmed the only published host binding was `127.0.0.1:1883`. With
+  `log_type all`, Mosquitto recorded `Received PUBLISH` on `orca/discovery`
+  with QoS 0 (35 bytes), followed by a clean `DISCONNECT`.
+- The first publish attempt's MQTT.js callback returned before the broker log
+  showed a PUBLISH. The temporary worker had immediately called
+  `client.end(true)`, which force-destroyed the socket after the QoS 0 stream
+  write. Changing the test to graceful `client.end(false, callback)` produced
+  broker-confirmed receipt; the callback alone is not receipt evidence.
+- The worker request returned `{ published: true, qos: 0 }`; its secret-store
+  checks returned `os-keyring`, and its IPv4 diagnostic reported one private
+  interface. The live status-bar screenshot showed the published state. The
+  publisher uses async MQTT.js callbacks in the worker process; the Orca
+  desktop remained responsive and showed the status update.
+- The official typings were placed in `.orca/types/` for the throwaway
+  experiment; no replacement API declarations were authored. Preserve the
+  generated `src/worker.ts` entry pattern in any later work.
+- Final gate: **GO for MQTT feasibility only**. The requested scope stopped at
+  Task 1; no Task 2 or product implementation was started. The unloaded
+  temporary plugin and npm files remain under
+  `/tmp/orca-publisher-discovery-2026-11-06`; the shell policy denied removal.
