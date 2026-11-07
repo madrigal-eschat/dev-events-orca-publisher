@@ -59,7 +59,7 @@ Run `orca --version`, then use `orca plugin create <temporary-directory> --templ
 
 - [ ] **Step 2: Inventory the observable editor and agent lifecycle**
 
-Use the generated types and Orca's installed/API documentation to record exact event names, payload shapes, and capability requirements for file saved/opened/closed, focus gained/lost, VCS commit/branch/push, task/test lifecycle, and agent started/working/waiting/idle/finished/failed. Mark unsupported events explicitly; do not infer task or test events from terminal text. Confirm which agent identifiers, opaque session IDs, worktree roots, and machine-readable waiting/failure reasons can be obtained without reading prompts or agent output.
+Use the generated types and Orca's installed/API documentation to record exact event names, payload shapes, and capability requirements for file saved/opened/closed, focus gained/lost, VCS commit/branch/push, task/test lifecycle, and agent status changes (`working`, `blocked`, `waiting`, `done` with outcome) and any agent start/exit signal. Mark unsupported events explicitly; do not infer task or test events from terminal text. Confirm which agent identifiers, opaque session IDs, worktree roots, and machine-readable waiting/failure reasons can be obtained without reading prompts or agent output.
 
 - [ ] **Step 3: Prove MQTT works from the trusted worker**
 
@@ -77,26 +77,25 @@ Record a PASS only if the worker itself can establish MQTT connectivity and publ
 
 If MQTT cannot run in the worker, stop after the note and report the evidence and options to the owner. Do not create plugin implementation files, update protocol or CI repositories, or introduce a companion process unless the owner explicitly approves that architecture. If PASS, remove only the known throwaway directory and proceed to Task 2.
 
-## Task 2: Define dev-events 1.1 agent event contract
+## Task 2: Define dev-events 1.1 agent event contract — DONE
+
+**Status:** done. Merged in [madrigal-eschat/dev-events-mqtt#4](https://github.com/madrigal-eschat/dev-events-mqtt/pull/4); `MESSAGE-FORMAT.md` ("Agent events", version 1.1) is the source of truth. Do not redefine the contract here.
 
 **Files:**
-- Modify in `dev-events-mqtt`: `MESSAGE-FORMAT.md`
+- Modified in `dev-events-mqtt`: `MESSAGE-FORMAT.md`
 
-- [ ] **Step 1: Derive the event rows from the passing discovery note**
+The contract is host-neutral and defines four types: `devevents.agent.started`, `devevents.agent.turn.started`, `devevents.agent.turn.ended` (required `reason`: `waiting` | `interrupted` | `finished` | `failed`), and `devevents.agent.exited` (no exit outcome field). `agent`, `session` and `worktree` are optional in `data`, omitted when unavailable and never `null` or a placeholder. Prompts, agent output, file contents and credentials are never valid payload fields. The envelope is unchanged (CloudEvents 1.0).
 
-Prepare definitions for `devevents.agent.started`, `devevents.agent.working`, `devevents.agent.waiting`, `devevents.agent.idle`, `devevents.agent.finished`, and `devevents.agent.failed`. Include `agent` as required; document `session`, `worktree`, and `reason` as optional. Keep `reason` a short machine-readable code only for waiting/failed states. If discovery shows a proposed state is not observable, document the supported subset rather than inventing a trigger.
+- [x] **Step 1: Derive the event rows from the discovery note**
+- [x] **Step 2: Update and review `MESSAGE-FORMAT.md`**
+- [x] **Step 3: Run the MQTT repository's documentation checks and open its PR**
+- [x] **Step 4: Commit the protocol change**
 
-- [ ] **Step 2: Update and review `MESSAGE-FORMAT.md`**
+The Orca-specific mapping onto this contract lives in the design spec ("Mapping from Orca"), not in `MESSAGE-FORMAT.md`. The publisher's first release is gated on this contract being merged, which it now is.
 
-Add a version 1.1 note stating that the envelope remains CloudEvents 1.0 and only event types are added. Document fields and an example for every final supported type; state that prompts, agent output, file contents, and credentials are never valid payload fields. Check that optional fields are omitted, not null, and that existing 1.0 definitions remain unchanged.
+## Task 1b (optional spike): agent started/exited signals
 
-- [ ] **Step 3: Run the MQTT repository's documentation checks and open its PR**
-
-Run the existing markdown/prose lint workflows against `MESSAGE-FORMAT.md`; verify the diff is limited to the agreed event additions/version note. Open a PR against `madrigal-eschat/dev-events-mqtt` and record its URL in the implementation handoff. The publisher may proceed against the reviewed contract, but its first release is gated on this PR being merged before or together with that release.
-
-- [ ] **Step 4: Commit the protocol change**
-
-Commit in the `dev-events-mqtt` checkout with a Conventional Commit, for example `feat: define agent lifecycle events`.
+Owner not yet decided. The 1.1 contract defines `devevents.agent.started` and `devevents.agent.exited`, but the Task 1 discovery found no clean Orca signal for either: `agent.launch.before` is pre-launch (it does not prove a launch succeeded and its `command` may contain a prompt), and the workspace and terminal events give no session start or end. Until a throwaway spike, run like Task 1 and recorded in the discovery note, proves a reliable signal that needs no prompt or output access, the publisher does not emit these two types and no document may claim that Orca does. This task does not block the first release (see the design spec, "Order of work").
 
 ## Task 3: Add reusable Node, coverage, and gitleaks workflows
 
@@ -177,7 +176,7 @@ Add tests proving OFF events are discarded, REDACTED removes sensitive optional 
 
 - [ ] **Step 4: Implement allowlisted payload construction**
 
-Construct each event payload from explicit per-type field allowlists. Never forward raw Orca objects or arbitrary agent-provided strings. Only permit `reason` as the discovered short machine-readable code for waiting/failed events; reject free text. For `subject` and worktree paths, apply the selected settings and `~/...` form; omit or mask them when disabled. Expose `allEventsOff()` for the startup warning and status surface.
+Construct each event payload from explicit per-type field allowlists. Never forward raw Orca objects or arbitrary agent-provided strings. Only permit `reason` on `devevents.agent.turn.ended`, and only as one of `waiting`, `interrupted`, `finished` or `failed`; reject free text and any other value. `agent` and `session` are not allowlisted for Orca agent events because Orca exposes neither. For `subject` and worktree paths, apply the selected settings and `~/...` form; omit or mask them when disabled. Expose `allEventsOff()` for the startup warning and status surface.
 
 - [ ] **Step 5: Run focused tests and commit**
 
@@ -223,11 +222,11 @@ Run `npm test -- test/mqtt/envelope.test.ts test/mqtt/contract.test.ts`, then li
 
 - [ ] **Step 1: Test mappings using observed Orca inputs**
 
-For each supported event in the discovery note, create an input fixture from the real Orca callback/state shape and assert the exact dev-events type and allowlisted payload. Cover the agent transitions Orca actually exposes, including distinct waiting/idle/finished/failed meanings where observable. Assert unsupported editor/task/test events produce no event rather than inferred terminal-output events.
+For each supported event in the discovery note, create an input fixture from the real Orca callback/state shape and assert the exact dev-events type and allowlisted payload. Cover the agent transitions Orca actually exposes, following the design spec's "Mapping from Orca": `working` -> `turn.started`; `blocked` and `waiting` -> `turn.ended` with `reason` `waiting`; `done` with outcome `success` -> `finished`, `failure` -> `failed`, `cancellation`, `interruption` or `superseded` -> `interrupted`. Do not write a fixture for outcome `unconfirmed` until the owner settles that open question. Assert that `devevents.agent.started` and `devevents.agent.exited` are never produced (see Task 1b). Assert unsupported editor/task/test events produce no event rather than inferred terminal-output events.
 
 - [ ] **Step 2: Implement the mapping table and thin Orca adapter**
 
-Map only confirmed Orca callbacks to existing `devevents.*` types and Task 2 agent types. Keep Orca-specific callback parsing inside `orca-adapter.ts`; mapping output must be typed event names and allowlisted data, never a raw Orca callback object. Do not add event types for activity the API cannot observe.
+Map only confirmed Orca callbacks to existing `devevents.*` types and the 1.1 agent types (`turn.started`, `turn.ended`; `started` and `exited` only if Task 1b proves a signal). Keep Orca-specific callback parsing inside `orca-adapter.ts`; mapping output must be typed event names and allowlisted data, never a raw Orca callback object. Do not add event types for activity the API cannot observe.
 
 - [ ] **Step 3: Wire callbacks to the non-blocking publisher**
 

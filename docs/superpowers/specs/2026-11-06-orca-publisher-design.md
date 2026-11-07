@@ -28,8 +28,10 @@ What happens to the events at the other end is out of scope. **[decided]**
    exposes it), task and test lifecycle where Orca has a meaningful notion of
    one. **[decided]** Publish only the subset Orca can really observe; the
    protocol allows any subset.
-2. Publish new *agent lifecycle events*, proposed as **dev-events 1.1**
-   (a minor bump: new event types only, envelope unchanged). **[decided]**
+2. Publish *agent lifecycle events*, defined by **dev-events 1.1** (a minor
+   bump: new event types only, envelope unchanged; merged in
+   `madrigal-eschat/dev-events-mqtt#4`). **[decided]** Orca can supply the
+   turn events today; see "Mapping from Orca" for what is not yet derivable.
 3. Same envelope and source conventions as the JetBrains publisher:
    CloudEvents 1.0, `sourcetype: "editor"`, `source: editor/{host}/orca`
    (`family` = `orca`, `specific` omitted). **[decided]**
@@ -82,28 +84,66 @@ skipped and listed under "Unsupported" in the README.
 | `devevents.vcs.committed` / `branch.changed` / `pushed` | git activity in a worktree |
 | `devevents.task.*`, `devevents.test.*` | only if Orca exposes task/test runs; otherwise skip (do not guess from terminal output) |
 
-### New agent lifecycle events (dev-events 1.1) **[call: names and fields]**
+### Agent lifecycle events (dev-events 1.1)
 
-Proposed types, to be aligned with Orca's real agent states once known:
+The agent event types are defined by `dev-events-mqtt/MESSAGE-FORMAT.md`
+("Agent events", version 1.1, merged in `madrigal-eschat/dev-events-mqtt#4`).
+That document is host-neutral and is the source of truth; this section only
+summarises it and says how Orca maps onto it.
 
 | type | meaning |
 |---|---|
-| `devevents.agent.started` | an agent session began in a worktree |
-| `devevents.agent.working` | the agent is actively working |
-| `devevents.agent.waiting` | the agent needs the user (input/permission) |
-| `devevents.agent.idle` | the agent finished a turn and is idle |
-| `devevents.agent.finished` | the agent session ended normally |
-| `devevents.agent.failed` | the agent session ended abnormally |
+| `devevents.agent.started` | an agent session starts |
+| `devevents.agent.turn.started` | the agent begins a turn |
+| `devevents.agent.turn.ended` | the agent ends a turn; `reason` is required |
+| `devevents.agent.exited` | the agent session ends (no exit outcome field) |
 
-Data fields (all optional unless noted; privacy per-event as below):
-`agent` (required: product id, e.g. `claude`, `copilot`, `codex`), `session`
-(opaque id), `worktree` (home-relative path), `reason` (for `waiting`/`failed`,
-short machine-readable code, never free text from the agent). Agent prompts,
-output and file contents are never published, in any mode. **[call]**
+Data fields are all optional except `reason` on `turn.ended`: `agent`
+(identifier or name), `session` (opaque session id), `worktree` (worktree path
+or identifier), and `reason` (`waiting` | `interrupted` | `finished` |
+`failed`; `turn.ended` only). Optional fields are omitted when unavailable,
+never `null` or a placeholder. Prompts, agent output, file contents and
+credentials are never valid payload fields, in any mode. Implementation-specific
+data has no place in `data`; the upstream mechanism is CloudEvents extension
+attributes, and this publisher does not use them.
 
-Deliverable: a pull request to `madrigal-eschat/dev-events-mqtt` adding these
-types to `MESSAGE-FORMAT.md` with a "version 1.1" note, merged before or
-together with the first release of this publisher.
+#### Mapping from Orca
+
+Source: the discovery note ("Observable events and agent states"). Orca's
+`agent.status.changed` event reports a `state` of `working`, `blocked`,
+`waiting` or `done`, and an optional `mainAgent.outcome` of `success`,
+`failure`, `cancellation`, `superseded`, `interruption` or `unconfirmed`.
+
+| Orca signal | dev-events type | `reason` |
+|---|---|---|
+| `state` = `working` | `devevents.agent.turn.started` | n/a |
+| `state` = `blocked` | `devevents.agent.turn.ended` | `waiting` |
+| `state` = `waiting` | `devevents.agent.turn.ended` | `waiting` |
+| `state` = `done`, outcome `success` | `devevents.agent.turn.ended` | `finished` |
+| `state` = `done`, outcome `failure` | `devevents.agent.turn.ended` | `failed` |
+| `state` = `done`, outcome `cancellation`, `interruption` or `superseded` | `devevents.agent.turn.ended` | `interrupted` |
+| `state` = `done`, outcome `unconfirmed` | **open question** | not decided |
+
+Field handling for Orca:
+
+- `agent` and `session` are omitted: Orca exposes neither on the status event
+  (`paneKey` and `terminalId` are not defined as session ids).
+- `worktree` is sent when known, as a home-relative path (`~/...`), the same
+  form as the worktree root used for `subject`.
+
+Open questions:
+
+- **`unconfirmed` outcome.** There is no agreed mapping for `done` with outcome
+  `unconfirmed`. Do not invent one; the owner decides (for example, whether
+  it maps to `finished`, `interrupted`, or no event) before it is implemented.
+- **`devevents.agent.started` and `devevents.agent.exited` are not yet
+  derivable from the Orca plugin API.** The protocol defines them, but
+  `agent.launch.before` is pre-launch (it does not prove a launch succeeded and
+  its `command` may contain a prompt) and the workspace and terminal events do
+  not give a clean session start or end signal. The publisher does not emit
+  either type, and nothing in this project may claim that Orca does, until a
+  follow-up spike (Task 1b in the implementation plan, owner not yet decided)
+  proves a reliable signal.
 
 ## Settings and privacy **[decided: same as JetBrains]**
 
@@ -211,23 +251,25 @@ CI workflows call the shared reusable workflows in
    outbound MQTT connection and which client library works; check secret
    storage and what UI surfaces exist. Write the findings into
    `docs/superpowers/notes/`. If MQTT is not possible, stop here and report.
-2. Draft the dev-events 1.1 agent event types from the real agent states and
-   open the PR against `madrigal-eschat/dev-events-mqtt`. The builder may open
-   PRs against `dev-events-mqtt` and `ci-workflows`; the owner reviews and
-   merges them, and creates the GitHub repository and the GitLab mirror.
+2. dev-events 1.1 agent event types: done, merged in
+   `madrigal-eschat/dev-events-mqtt#4`. The builder may open PRs against
+   `ci-workflows`; the owner reviews and merges them, and creates the GitHub
+   repository and the GitLab mirror.
 3. Add `_node-ci`, `_node-coverage` and `_gitleaks` to `ci-workflows` (PR,
    owner merges and releases). While that PR is in review, this repo may
    reference the workflows by branch; the pin must be a released commit SHA
    before this repo's own CI PR merges.
 4. Build the plugin with tests, then integration test, then docs and release.
 
-Minimum for a first release: the agent lifecycle events. Editor events are
+Minimum for a first release: the agent turn events (`turn.started` and
+`turn.ended`); `started` and `exited` are not required until Task 1b proves a
+signal. Editor events are
 best-effort; if few or none map to what Orca can observe, ship agent-only and
 say so in the README ("Unsupported").
 
 Event fields: `subject` is the worktree root; `source` host is the machine's
-hostname; `session` is the agent's session id so concurrent agents can be told
-apart.
+hostname. `session` is omitted for agent events because Orca exposes no
+session id (see "Mapping from Orca").
 
 Coverage: the 100% diff gate applies. A thin adapter layer around the Orca API
 and UI may be excluded from coverage, with an explicit, reviewed exclusion
@@ -257,8 +299,8 @@ API offers one.
 ## Calls made on the owner's behalf (please review)
 
 1. TypeScript worker plugin as the architecture.
-2. Agent event names and data fields above, and the rule that prompts and agent
-   output are never published in any mode.
+2. The Orca-to-1.1 mapping above, and the rule that prompts and agent output
+   are never published in any mode.
 3. A visible connection/last-error status surface (logs required, panel if
    Orca offers one).
 4. GitHub primary with GitLab mirror (matching the other madrigal-eschat repos).
