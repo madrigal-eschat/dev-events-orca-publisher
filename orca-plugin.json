@@ -3,11 +3,15 @@
   "id": "dev-events-orca-publisher",
   "name": "dev-events Orca Publisher",
   "version": "0.1.0",
-  "description": "Scaffold for the dev-events Orca publisher.",
+  "description": "Publishes privacy-safe Orca agent turn activity as dev-events MQTT messages.",
   "engines": {
     "orca": ">=1.4.248"
   },
   "execution": "trusted-worker",
   "pluginApi": 1,
+  "capabilities": [{ "kind": "storage:own" }, { "kind": "secrets:own" }, { "kind": "agent:read" }],
+  "contributes": {
+    "events": [{ "on": "agent.status.changed" }]
+  },
   "main": "src/worker.ts"
 }
