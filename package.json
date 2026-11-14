@@ -26,8 +26,12 @@
     "@semantic-release/release-notes-generator": "14.1.1",
     "@types/node": "26.6.6",
     "@vitest/coverage-v8": "5.1.0",
+    "ajv": "8.20.0",
     "semantic-release": "25.0.9",
     "typescript": "7.0.2",
     "vitest": "5.1.0"
+  },
+  "dependencies": {
+    "mqtt": "5.16.1"
   }
 }
