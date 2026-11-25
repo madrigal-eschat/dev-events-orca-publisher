@@ -2,8 +2,8 @@ import { connect as mqttConnect } from 'mqtt'
 import type { JsonValue } from 'orca/host'
 import type { OrcaWorkerApi } from 'orca/worker'
 import { beforeEach, expect, test, vi } from 'vitest'
-import { activatePublisher } from './index'
-import type { MqttClientLike } from './mqtt/publisher'
+import { activatePublisher } from '../../src/index'
+import type { MqttClientLike } from '../../src/mqtt/publisher'
 
 vi.mock('mqtt', () => ({ connect: vi.fn() }))
 

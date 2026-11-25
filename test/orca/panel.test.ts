@@ -1,8 +1,8 @@
 import type { PanelContext } from 'orca'
 import { assert, hostError, mockHost, mount, mountWorker } from 'orca/testing'
 import { test, vi } from 'vitest'
-import * as panelModule from './panel'
-import * as workerModule from './worker'
+import * as panelModule from '../../src/panel'
+import * as workerModule from '../../src/worker'
 
 const PASSWORD = 'panel-only-secret'
 const RAW_ERROR = 'secret store internals containing panel-only-secret'
