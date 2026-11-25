@@ -9,9 +9,46 @@
   },
   "execution": "trusted-worker",
   "pluginApi": 1,
-  "capabilities": [{ "kind": "storage:own" }, { "kind": "secrets:own" }, { "kind": "agent:read" }],
+  "capabilities": [{ "kind": "settings:own" }, { "kind": "secrets:own" }, { "kind": "agent:read" }],
   "contributes": {
     "events": [{ "on": "agent.status.changed" }],
+    "panels": [
+      {
+        "id": "mqtt-credentials",
+        "title": "MQTT Password",
+        "ui": "components",
+        "entry": "src/panel.ts"
+      }
+    ],
+    "settings": [
+      {
+        "key": "brokerUrl",
+        "title": "Broker URL",
+        "type": "string",
+        "default": "tcp://localhost:1883"
+      },
+      { "key": "username", "title": "Username", "type": "string", "default": "" },
+      { "key": "clientId", "title": "Client ID", "type": "string", "default": "" },
+      { "key": "topicPrefix", "title": "Topic prefix", "type": "string", "default": "dev-events" },
+      { "key": "includeHost", "title": "Include host", "type": "boolean", "default": true },
+      { "key": "hostLabel", "title": "Host label", "type": "string", "default": "" },
+      { "key": "homeSubnet", "title": "Home subnet", "type": "string", "default": "" },
+      { "key": "includeProject", "title": "Include project", "type": "boolean", "default": true },
+      {
+        "key": "agentTurnStartedMode",
+        "title": "Agent turn started mode",
+        "type": "string",
+        "default": "OFF",
+        "enum": ["OFF", "REDACTED", "FULL"]
+      },
+      {
+        "key": "agentTurnEndedMode",
+        "title": "Agent turn ended mode",
+        "type": "string",
+        "default": "OFF",
+        "enum": ["OFF", "REDACTED", "FULL"]
+      }
+    ],
     "statusBarItems": [
       {
         "id": "mqtt-status",

@@ -3,7 +3,6 @@ import type { OrcaWorkerApi } from 'orca/worker'
 import { expect, test, vi } from 'vitest'
 import { activatePublisher } from '../../src/index'
 import type { MqttClientLike } from '../../src/mqtt/publisher'
-import { createDefaultSettings, serializeSettings } from '../../src/settings/settings'
 
 vi.mock('mqtt', () => ({ connect: vi.fn() }))
 
@@ -33,6 +32,11 @@ class FakeClient implements MqttClientLike {
     callback()
   }
 
+  end(_force: boolean, callback: (error?: Error | null) => void): this {
+    callback()
+    return this
+  }
+
   connect(): void {
     for (const listener of this.listeners) {
       listener()
@@ -41,16 +45,26 @@ class FakeClient implements MqttClientLike {
 }
 
 test('activates the publisher and forwards only mapped agent turn events', async () => {
-  const settings = createDefaultSettings('orca-client')
-  settings.hostLabel = 'workstation'
-  settings.eventModes['devevents.agent.turn.started'] = 'FULL'
   const handlers = new Map<string, (payload: unknown) => void>()
+  const settingValues: Record<string, string | boolean> = {
+    brokerUrl: 'tcp://localhost:1883',
+    username: '',
+    clientId: 'orca-client',
+    topicPrefix: 'dev-events',
+    includeHost: true,
+    hostLabel: 'workstation',
+    homeSubnet: '',
+    includeProject: true,
+    agentTurnStartedMode: 'FULL',
+    agentTurnEndedMode: 'OFF'
+  }
   const client = new FakeClient()
   vi.mocked(mqttConnect).mockReturnValue(client as ReturnType<typeof mqttConnect>)
   const orca = {
-    storage: {
-      get: vi.fn().mockResolvedValue(serializeSettings(settings)),
-      set: vi.fn()
+    settings: {
+      get: vi.fn(async (key: string) => settingValues[key]),
+      set: vi.fn(),
+      onDidChange: vi.fn(() => ({ dispose: vi.fn() }))
     },
     secrets: { get: vi.fn().mockResolvedValue(null) },
     log: vi.fn(),
@@ -63,7 +77,7 @@ test('activates the publisher and forwards only mapped agent turn events', async
     }
   } as unknown as OrcaWorkerApi
 
-  await activatePublisher(orca)
+  const cleanup = await activatePublisher(orca)
   client.connect()
   handlers.get('agent.status.changed')?.({
     workspaceId: 'private-workspace-id',
@@ -91,4 +105,5 @@ test('activates the publisher and forwards only mapped agent turn events', async
     data: {},
     source: 'editor/workstation/orca'
   })
+  await cleanup()
 })

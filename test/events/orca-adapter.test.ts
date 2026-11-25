@@ -24,7 +24,7 @@ test('subscribes only to agent status and publishes its mapped event', () => {
   } as unknown as OrcaWorkerApi
   const onMappedEvent = vi.fn()
 
-  const subscription = registerOrcaEventAdapter(orca, settings(), onMappedEvent)
+  const subscription = registerOrcaEventAdapter(orca, settings, onMappedEvent)
   onStatusChanged?.({
     workspaceId: null,
     paneKey: 'pane-secret',
@@ -53,7 +53,7 @@ test('does not forward events disabled by settings', () => {
   } as unknown as OrcaWorkerApi
   const onMappedEvent = vi.fn()
 
-  registerOrcaEventAdapter(orca, createDefaultSettings('orca-client'), onMappedEvent)
+  registerOrcaEventAdapter(orca, () => createDefaultSettings('orca-client'), onMappedEvent)
   onStatusChanged?.({
     workspaceId: null,
     paneKey: 'pane-secret',
@@ -61,6 +61,34 @@ test('does not forward events disabled by settings', () => {
     receivedAt: 10
   })
 
+  expect(onMappedEvent).not.toHaveBeenCalled()
+})
+
+test('reads the latest event modes without registering another subscription', () => {
+  let onStatusChanged: ((payload: unknown) => void) | undefined
+  const orca = {
+    events: {
+      on: vi.fn((_event: string, handler: (payload: unknown) => void) => {
+        onStatusChanged = handler
+        return { dispose: vi.fn() }
+      })
+    }
+  } as unknown as OrcaWorkerApi
+  const currentSettings = settings()
+  const getSettings = vi.fn(() => currentSettings)
+  const onMappedEvent = vi.fn()
+
+  registerOrcaEventAdapter(orca, getSettings, onMappedEvent)
+  currentSettings.eventModes['devevents.agent.turn.ended'] = 'OFF'
+  onStatusChanged?.({
+    workspaceId: null,
+    paneKey: 'pane-secret',
+    state: 'blocked',
+    receivedAt: 10
+  })
+
+  expect(getSettings).toHaveBeenCalledTimes(1)
+  expect(orca.events.on).toHaveBeenCalledTimes(1)
   expect(onMappedEvent).not.toHaveBeenCalled()
 })
 
@@ -76,7 +104,7 @@ test('ignores a done status without a confirmed outcome', () => {
   } as unknown as OrcaWorkerApi
   const onMappedEvent = vi.fn()
 
-  registerOrcaEventAdapter(orca, settings(), onMappedEvent)
+  registerOrcaEventAdapter(orca, settings, onMappedEvent)
   onStatusChanged?.({
     workspaceId: null,
     paneKey: 'pane-secret',

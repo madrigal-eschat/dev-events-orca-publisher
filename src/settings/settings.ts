@@ -1,5 +1,4 @@
-import type { StorageApi } from 'orca/host'
-import { isRecord } from '../util/is-record'
+import type { SettingsApi } from 'orca/host'
 
 export const EVENT_TYPES = [
   'devevents.task.started',
@@ -45,10 +44,9 @@ export type SecretStore = {
 }
 
 const PASSWORD_SECRET_KEY = 'broker-password'
-const SETTINGS_STORAGE_KEY = 'publisher-settings'
 
 export function createDefaultSettings(
-  clientId = globalThis.crypto.randomUUID()
+  clientId: string = globalThis.crypto.randomUUID()
 ): PublisherSettings {
   const eventModes = {} as Record<EventType, EventMode>
   for (const eventType of EVENT_TYPES) {
@@ -76,75 +74,143 @@ function isEventMode(value: unknown): value is EventMode {
   return value === 'OFF' || value === 'REDACTED' || value === 'FULL'
 }
 
-function isEventModes(value: unknown): value is Record<EventType, EventMode> {
-  return isRecord(value) && EVENT_TYPES.every((eventType) => isEventMode(value[eventType]))
+function isString(value: unknown): value is string {
+  return typeof value === 'string'
 }
 
-function isPublisherSettings(value: unknown): value is PublisherSettings {
-  return (
-    isRecord(value) &&
-    typeof value.brokerUrl === 'string' &&
-    typeof value.username === 'string' &&
-    typeof value.clientId === 'string' &&
-    typeof value.topicPrefix === 'string' &&
-    typeof value.includeHost === 'boolean' &&
-    typeof value.hostLabel === 'string' &&
-    typeof value.homeSubnet === 'string' &&
-    typeof value.includeProject === 'boolean' &&
-    isEventModes(value.eventModes)
-  )
+function invalidSetting(key: string): never {
+  throw new TypeError(`Invalid publisher setting: ${key}`)
 }
 
-export function deserializeSettings(serialized: string): PublisherSettings {
-  const storedValue: unknown = JSON.parse(serialized)
-  if (
-    !isRecord(storedValue) ||
-    (storedValue.eventModes !== undefined && !isRecord(storedValue.eventModes))
-  ) {
-    throw new TypeError('Invalid serialized publisher settings')
+function validateBrokerUrl(value: string): void {
+  let url: URL
+  try {
+    url = new URL(value)
+  } catch {
+    invalidSetting('brokerUrl')
   }
 
-  const defaults = createDefaultSettings()
-  const value = {
-    ...defaults,
-    ...storedValue,
-    eventModes: { ...defaults.eventModes, ...storedValue.eventModes }
+  if (url.hostname === '') {
+    throw new TypeError('Broker URL must include a hostname')
   }
 
-  for (const eventType of EVENT_TYPES) {
-    const mode = value.eventModes[eventType]
-    if (!isEventMode(mode)) {
-      throw new TypeError(`Invalid publisher event mode: ${eventType}`)
-    }
+  if (url.username !== '' || url.password !== '') {
+    throw new TypeError('Broker URL must not contain a username or password')
   }
-
-  if (!isPublisherSettings(value)) {
-    throw new TypeError('Invalid serialized publisher settings')
-  }
-
-  return value
 }
 
 export async function loadSettings(
-  storage: Pick<StorageApi, 'get' | 'set'>
+  settings: Pick<SettingsApi, 'get' | 'set'>,
+  createClientId: () => string = () => globalThis.crypto.randomUUID()
 ): Promise<PublisherSettings> {
-  const storedSettings = await storage.get(SETTINGS_STORAGE_KEY)
-  if (storedSettings === null) {
-    const defaults = createDefaultSettings()
-    await storage.set(SETTINGS_STORAGE_KEY, serializeSettings(defaults))
-    return defaults
-  }
-  if (typeof storedSettings !== 'string') {
-    throw new TypeError('Invalid stored publisher settings')
-  }
-  return deserializeSettings(storedSettings)
-}
+  const defaults = createDefaultSettings('')
+  const settingValues = await Promise.all([
+    settings.get('brokerUrl'),
+    settings.get('username'),
+    settings.get('clientId'),
+    settings.get('topicPrefix'),
+    settings.get('includeHost'),
+    settings.get('hostLabel'),
+    settings.get('homeSubnet'),
+    settings.get('includeProject'),
+    settings.get('agentTurnStartedMode'),
+    settings.get('agentTurnEndedMode')
+  ])
+  const [
+    brokerUrlValue,
+    usernameValue,
+    clientIdValue,
+    topicPrefixValue,
+    includeHostValue,
+    hostLabelValue,
+    homeSubnetValue,
+    includeProjectValue,
+    agentTurnStartedModeValue,
+    agentTurnEndedModeValue
+  ] = settingValues
 
-export function persistSettings(
-  storage: Pick<StorageApi, 'set'>,
-  settings: PublisherSettings
-): Promise<void> {
-  return storage.set(SETTINGS_STORAGE_KEY, serializeSettings(settings))
+  const brokerUrl =
+    brokerUrlValue === undefined
+      ? defaults.brokerUrl
+      : isString(brokerUrlValue)
+        ? brokerUrlValue
+        : invalidSetting('brokerUrl')
+  validateBrokerUrl(brokerUrl)
+  const username =
+    usernameValue === undefined
+      ? defaults.username
+      : isString(usernameValue)
+        ? usernameValue
+        : invalidSetting('username')
+  let clientId =
+    clientIdValue === undefined
+      ? defaults.clientId
+      : isString(clientIdValue)
+        ? clientIdValue
+        : invalidSetting('clientId')
+  const topicPrefix =
+    topicPrefixValue === undefined
+      ? defaults.topicPrefix
+      : isString(topicPrefixValue)
+        ? topicPrefixValue
+        : invalidSetting('topicPrefix')
+  const includeHost =
+    includeHostValue === undefined
+      ? defaults.includeHost
+      : typeof includeHostValue === 'boolean'
+        ? includeHostValue
+        : invalidSetting('includeHost')
+  const hostLabel =
+    hostLabelValue === undefined
+      ? defaults.hostLabel
+      : isString(hostLabelValue)
+        ? hostLabelValue
+        : invalidSetting('hostLabel')
+  const homeSubnet =
+    homeSubnetValue === undefined
+      ? defaults.homeSubnet
+      : isString(homeSubnetValue)
+        ? homeSubnetValue
+        : invalidSetting('homeSubnet')
+  const includeProject =
+    includeProjectValue === undefined
+      ? defaults.includeProject
+      : typeof includeProjectValue === 'boolean'
+        ? includeProjectValue
+        : invalidSetting('includeProject')
+  const agentTurnStartedMode =
+    agentTurnStartedModeValue === undefined
+      ? 'OFF'
+      : isEventMode(agentTurnStartedModeValue)
+        ? agentTurnStartedModeValue
+        : invalidSetting('agentTurnStartedMode')
+  const agentTurnEndedMode =
+    agentTurnEndedModeValue === undefined
+      ? 'OFF'
+      : isEventMode(agentTurnEndedModeValue)
+        ? agentTurnEndedModeValue
+        : invalidSetting('agentTurnEndedMode')
+
+  if (clientId === '') {
+    clientId = createClientId()
+    await settings.set('clientId', clientId)
+  }
+
+  const eventModes = { ...defaults.eventModes }
+  eventModes['devevents.agent.turn.started'] = agentTurnStartedMode
+  eventModes['devevents.agent.turn.ended'] = agentTurnEndedMode
+
+  return {
+    brokerUrl,
+    username,
+    clientId,
+    topicPrefix,
+    includeHost,
+    hostLabel,
+    homeSubnet,
+    includeProject,
+    eventModes
+  }
 }
 
 export function savePassword(secrets: SecretStore, password: string): Promise<void> {

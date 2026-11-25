@@ -1,6 +1,14 @@
 import type { OrcaWorkerApi } from 'orca/worker'
 import { activatePublisher } from './index'
 
-export default function activate(orca: OrcaWorkerApi): Promise<void> {
-  return activatePublisher(orca)
+let cleanupPublisher: (() => Promise<void>) | undefined
+
+export default async function activate(orca: OrcaWorkerApi): Promise<void> {
+  cleanupPublisher = await activatePublisher(orca)
+}
+
+export async function deactivate(): Promise<void> {
+  const cleanup = cleanupPublisher
+  cleanupPublisher = undefined
+  await cleanup?.()
 }
