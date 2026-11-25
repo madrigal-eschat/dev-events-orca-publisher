@@ -11,7 +11,16 @@
   "pluginApi": 1,
   "capabilities": [{ "kind": "storage:own" }, { "kind": "secrets:own" }, { "kind": "agent:read" }],
   "contributes": {
-    "events": [{ "on": "agent.status.changed" }]
+    "events": [{ "on": "agent.status.changed" }],
+    "statusBarItems": [
+      {
+        "id": "mqtt-status",
+        "text": "MQTT: Connecting",
+        "icon": "plug",
+        "tone": "neutral",
+        "tooltip": "MQTT publisher connection status"
+      }
+    ]
   },
   "main": "src/worker.ts"
 }
