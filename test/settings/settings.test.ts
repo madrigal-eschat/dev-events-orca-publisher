@@ -1,19 +1,77 @@
-import type { JsonValue, StorageApi } from 'orca/host'
-import { describe, expect, test } from 'vitest'
+import type { JsonValue, SettingsApi } from 'orca/host'
+import { describe, expect, test, vi } from 'vitest'
 import {
   allEventsOff,
   createDefaultSettings,
-  deserializeSettings,
+  EVENT_TYPES,
   getPassword,
   loadSettings,
-  persistSettings,
+  type PublisherSettings,
   type SecretStore,
   savePassword,
   serializeSettings
 } from '../../src/settings/settings'
 
+const DECLARED_SETTING_KEYS = [
+  'brokerUrl',
+  'username',
+  'clientId',
+  'topicPrefix',
+  'includeHost',
+  'hostLabel',
+  'homeSubnet',
+  'includeProject',
+  'agentTurnStartedMode',
+  'agentTurnEndedMode'
+] as const
+
+class FakeSettings implements Pick<SettingsApi, 'get' | 'set'> {
+  readonly values = new Map<string, JsonValue>()
+  readonly gets: string[] = []
+  readonly sets: Array<[string, JsonValue]> = []
+
+  constructor(initialValues: Record<string, JsonValue> = {}) {
+    for (const [key, value] of Object.entries(initialValues)) {
+      this.values.set(key, value)
+    }
+  }
+
+  async get(): Promise<Record<string, JsonValue>>
+  async get(key: string): Promise<JsonValue | undefined>
+  async get(key?: string): Promise<Record<string, JsonValue> | JsonValue | undefined> {
+    if (key === undefined) {
+      return Object.fromEntries(this.values)
+    }
+    this.gets.push(key)
+    return this.values.get(key)
+  }
+
+  async set(key: string, value: JsonValue): Promise<void> {
+    this.sets.push([key, value])
+    this.values.set(key, value)
+  }
+}
+
+function declaredValues(
+  overrides: Partial<Record<(typeof DECLARED_SETTING_KEYS)[number], JsonValue>> = {}
+): Record<string, JsonValue> {
+  return {
+    brokerUrl: 'tcp://localhost:1883',
+    username: '',
+    clientId: 'native-client-id',
+    topicPrefix: 'dev-events',
+    includeHost: true,
+    hostLabel: '',
+    homeSubnet: '',
+    includeProject: true,
+    agentTurnStartedMode: 'OFF',
+    agentTurnEndedMode: 'OFF',
+    ...overrides
+  }
+}
+
 describe('publisher settings', () => {
-  test('uses the JetBrains defaults and generates a client ID', () => {
+  test('uses the declared defaults and generates a client ID', () => {
     const settings = createDefaultSettings()
 
     expect(settings.brokerUrl).toBe('tcp://localhost:1883')
@@ -23,10 +81,166 @@ describe('publisher settings', () => {
     )
     expect(settings.topicPrefix).toBe('dev-events')
     expect(settings.includeHost).toBe(true)
-    expect(settings.includeProject).toBe(true)
+    expect(settings.hostLabel).toBe('')
     expect(settings.homeSubnet).toBe('')
+    expect(settings.includeProject).toBe(true)
     expect(Object.values(settings.eventModes).every((mode) => mode === 'OFF')).toBe(true)
   })
+
+  test('maps declared Orca settings to publisher settings', async () => {
+    const settingsApi = new FakeSettings(
+      declaredValues({
+        brokerUrl: 'mqtts://broker.example:8883',
+        username: 'publisher',
+        clientId: 'saved-client-id',
+        topicPrefix: 'private-events',
+        includeHost: false,
+        hostLabel: 'workstation',
+        homeSubnet: '192.168.1.0/24',
+        includeProject: false,
+        agentTurnStartedMode: 'FULL',
+        agentTurnEndedMode: 'REDACTED'
+      })
+    )
+
+    const settings = await loadSettings(settingsApi)
+
+    expect(settings).toEqual<PublisherSettings>({
+      brokerUrl: 'mqtts://broker.example:8883',
+      username: 'publisher',
+      clientId: 'saved-client-id',
+      topicPrefix: 'private-events',
+      includeHost: false,
+      hostLabel: 'workstation',
+      homeSubnet: '192.168.1.0/24',
+      includeProject: false,
+      eventModes: {
+        ...Object.fromEntries(EVENT_TYPES.map((eventType) => [eventType, 'OFF' as const])),
+        'devevents.agent.turn.started': 'FULL',
+        'devevents.agent.turn.ended': 'REDACTED'
+      }
+    })
+    expect(settings.eventModes['devevents.agent.turn.started']).toBe('FULL')
+    expect(settings.eventModes['devevents.agent.turn.ended']).toBe('REDACTED')
+    expect(
+      EVENT_TYPES.filter(
+        (eventType) =>
+          eventType !== 'devevents.agent.turn.started' && eventType !== 'devevents.agent.turn.ended'
+      ).every((eventType) => settings.eventModes[eventType] === 'OFF')
+    ).toBe(true)
+    expect(settingsApi.gets).toEqual(DECLARED_SETTING_KEYS)
+    expect(settingsApi.sets).toEqual([])
+  })
+
+  test('loads native defaults and persists only a generated client ID', async () => {
+    const settingsApi = new FakeSettings()
+    const createClientId = vi.fn(() => 'generated-client-id')
+
+    const settings = await loadSettings(settingsApi, createClientId)
+
+    expect(settings).toEqual<PublisherSettings>({
+      brokerUrl: 'tcp://localhost:1883',
+      username: '',
+      clientId: 'generated-client-id',
+      topicPrefix: 'dev-events',
+      includeHost: true,
+      hostLabel: '',
+      homeSubnet: '',
+      includeProject: true,
+      eventModes: Object.fromEntries(EVENT_TYPES.map((eventType) => [eventType, 'OFF' as const]))
+    })
+    expect(settingsApi.sets).toEqual([['clientId', 'generated-client-id']])
+  })
+
+  test('strips password fields from serialized settings', () => {
+    const settings = { ...createDefaultSettings('client-id'), password: 'fixture-only' }
+
+    expect(JSON.parse(serializeSettings(settings))).toEqual(createDefaultSettings('client-id'))
+  })
+
+  test('uses a UUID when no client ID generator is supplied', async () => {
+    const settingsApi = new FakeSettings()
+    const settings = await loadSettings(settingsApi)
+
+    expect(settings.clientId).toMatch(/^[0-9a-f-]{36}$/i)
+    expect(settingsApi.sets).toEqual([['clientId', settings.clientId]])
+  })
+
+  test('generates and persists an empty client ID once', async () => {
+    const settingsApi = new FakeSettings(declaredValues({ clientId: '' }))
+    const createClientId = vi.fn(() => 'stable-client-id')
+
+    const firstLoad = await loadSettings(settingsApi, createClientId)
+    const secondLoad = await loadSettings(settingsApi, createClientId)
+
+    expect(firstLoad.clientId).toBe('stable-client-id')
+    expect(secondLoad.clientId).toBe('stable-client-id')
+    expect(createClientId).toHaveBeenCalledTimes(1)
+    expect(settingsApi.sets).toEqual([['clientId', 'stable-client-id']])
+  })
+
+  test.each([
+    ['brokerUrl', 42],
+    ['username', false],
+    ['clientId', 3],
+    ['topicPrefix', null],
+    ['includeHost', 'yes'],
+    ['hostLabel', {}],
+    ['homeSubnet', 5],
+    ['includeProject', 'true']
+  ])('rejects invalid value type for %s', async (key, value) => {
+    const settingsApi = new FakeSettings(declaredValues({ [key]: value }))
+
+    await expect(loadSettings(settingsApi, () => 'generated')).rejects.toThrow(
+      `Invalid publisher setting: ${key}`
+    )
+  })
+
+  test.each(['ALL', 'redacted', 1])('rejects invalid started event mode %s', async (mode) => {
+    const settingsApi = new FakeSettings(declaredValues({ agentTurnStartedMode: mode }))
+
+    await expect(loadSettings(settingsApi, () => 'generated')).rejects.toThrow(
+      'Invalid publisher setting: agentTurnStartedMode'
+    )
+  })
+
+  test.each(['ALL', 'full', true])('rejects invalid ended event mode %s', async (mode) => {
+    const settingsApi = new FakeSettings(declaredValues({ agentTurnEndedMode: mode }))
+
+    await expect(loadSettings(settingsApi, () => 'generated')).rejects.toThrow(
+      'Invalid publisher setting: agentTurnEndedMode'
+    )
+  })
+
+  test.each(['tcp://publisher@broker.example:1883', 'tcp://:secret@broker.example:1883'])(
+    'rejects broker URLs containing username or password: %s',
+    async (brokerUrl) => {
+      const settingsApi = new FakeSettings(declaredValues({ brokerUrl }))
+
+      await expect(loadSettings(settingsApi, () => 'generated')).rejects.toThrow(
+        'Broker URL must not contain a username or password'
+      )
+    }
+  )
+
+  test('rejects a malformed broker URL', async () => {
+    const settingsApi = new FakeSettings(declaredValues({ brokerUrl: 'not a URL' }))
+
+    await expect(loadSettings(settingsApi, () => 'generated')).rejects.toThrow(
+      'Invalid publisher setting: brokerUrl'
+    )
+  })
+
+  test.each(['localhost:1883', 'tcp:localhost:1883'])(
+    'rejects broker URLs without a hostname: %s',
+    async (brokerUrl) => {
+      const settingsApi = new FakeSettings(declaredValues({ brokerUrl }))
+
+      await expect(loadSettings(settingsApi, () => 'generated')).rejects.toThrow(
+        'Broker URL must include a hostname'
+      )
+    }
+  )
 
   test('detects whether every event type is disabled', () => {
     const settings = createDefaultSettings('client-id')
@@ -34,54 +248,6 @@ describe('publisher settings', () => {
     expect(allEventsOff(settings)).toBe(true)
     settings.eventModes['devevents.agent.turn.started'] = 'FULL'
     expect(allEventsOff(settings)).toBe(false)
-  })
-
-  test('loads defaults and persists settings through Orca plugin storage', async () => {
-    const values = new Map<string, JsonValue>()
-    const storage: Pick<StorageApi, 'get' | 'set'> = {
-      get: async (key) => values.get(key) ?? null,
-      set: async (key, value) => {
-        values.set(key, value)
-      }
-    }
-
-    const defaults = await loadSettings(storage)
-    expect(values.get('publisher-settings')).toBe(serializeSettings(defaults))
-    const settings = {
-      ...defaults,
-      brokerUrl: 'mqtts://broker.example:8883',
-      username: 'publisher',
-      topicPrefix: 'private-events',
-      includeHost: false,
-      hostLabel: 'workstation',
-      homeSubnet: '192.168.1.0/24',
-      includeProject: false,
-      eventModes: { ...defaults.eventModes, 'devevents.agent.turn.started': 'FULL' as const }
-    }
-    await persistSettings(storage, settings)
-
-    expect(await loadSettings(storage)).toEqual(settings)
-    expect(values.get('publisher-settings')).toBe(serializeSettings(settings))
-  })
-
-  test('rejects non-string publisher settings in plugin storage', async () => {
-    const storage: Pick<StorageApi, 'get' | 'set'> = {
-      get: async () => ({ invalid: true }),
-      set: async () => {}
-    }
-
-    await expect(loadSettings(storage)).rejects.toThrow('Invalid stored publisher settings')
-  })
-
-  test('persists a user-configurable host label and excludes passwords', () => {
-    const settings = createDefaultSettings('client-id')
-    settings.hostLabel = 'workstation'
-    const withUnexpectedPassword = Object.assign({}, settings, { password: 'do-not-persist' })
-    const serialized = serializeSettings(withUnexpectedPassword)
-
-    expect(deserializeSettings(serialized)).toEqual(settings)
-    expect(serialized).not.toContain('do-not-persist')
-    expect(JSON.parse(serialized)).not.toHaveProperty('password')
   })
 
   test('stores and retrieves a password only through the secret store', async () => {
@@ -97,41 +263,5 @@ describe('publisher settings', () => {
 
     expect(await getPassword(store)).toBe('secret-value')
     expect([...secrets.values()]).toEqual(['secret-value'])
-    expect(serializeSettings(createDefaultSettings('client-id'))).not.toContain('secret-value')
-  })
-
-  test('rejects malformed or invalid persisted settings', () => {
-    const serialized = serializeSettings(createDefaultSettings('client-id'))
-    const invalidBroker = JSON.parse(serialized) as Record<string, unknown>
-    invalidBroker.brokerUrl = null
-    const invalidToggle = JSON.parse(serialized) as Record<string, unknown>
-    invalidToggle.includeHost = 'yes'
-    const invalidMode = JSON.parse(serialized) as Record<string, unknown>
-    const eventModes = invalidMode.eventModes as Record<string, unknown>
-    eventModes['devevents.file.saved'] = 'ALL'
-
-    expect(() => deserializeSettings('null')).toThrow('Invalid serialized publisher settings')
-    expect(() => deserializeSettings('[]')).toThrow('Invalid serialized publisher settings')
-    expect(() => deserializeSettings(JSON.stringify(invalidBroker))).toThrow(
-      'Invalid serialized publisher settings'
-    )
-    expect(() => deserializeSettings(JSON.stringify(invalidToggle))).toThrow(
-      'Invalid serialized publisher settings'
-    )
-    expect(() => deserializeSettings(JSON.stringify(invalidMode))).toThrow(
-      'Invalid publisher event mode: devevents.file.saved'
-    )
-  })
-
-  test('fills missing persisted settings from defaults', () => {
-    const settings = deserializeSettings(
-      JSON.stringify({ brokerUrl: 'mqtts://broker.example', eventModes: {} })
-    )
-
-    expect(settings.brokerUrl).toBe('mqtts://broker.example')
-    expect(settings.clientId).not.toBe('')
-    expect(settings.username).toBe('')
-    expect(settings.includeHost).toBe(true)
-    expect(settings.eventModes).toEqual(createDefaultSettings('default-client').eventModes)
   })
 })

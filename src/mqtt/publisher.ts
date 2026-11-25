@@ -14,6 +14,7 @@ export type MqttConnectionOptions = {
 export interface MqttClientLike {
   on(event: 'connect' | 'reconnect' | 'close', listener: () => void): this
   on(event: 'error', listener: (error: Error) => void): this
+  end(force?: boolean, callback?: (error?: Error | null) => void): this
   publish(
     topic: string,
     message: string,
@@ -81,6 +82,8 @@ export class MqttPublisher {
   readonly #id: () => string
   readonly #onDiagnostics: (diagnostics: PublisherDiagnostics) => void
   #client: MqttClientLike | undefined
+  #closed = false
+  #closePromise: Promise<void> | undefined
   #diagnostics: PublisherDiagnostics = { connectionState: 'connecting', lastError: null }
 
   constructor(options: PublisherOptions) {
@@ -116,8 +119,41 @@ export class MqttPublisher {
     return { ...this.#diagnostics }
   }
 
+  close(): Promise<void> {
+    if (this.#closePromise !== undefined) {
+      return this.#closePromise
+    }
+
+    this.#closed = true
+    const client = this.#client
+    if (client === undefined) {
+      this.#closePromise = Promise.resolve()
+      return this.#closePromise
+    }
+
+    this.#closePromise = new Promise((resolve) => {
+      let completed = false
+      const finish = () => {
+        if (completed) {
+          return
+        }
+        completed = true
+        this.#updateDiagnostics('disconnected')
+        resolve()
+      }
+
+      try {
+        client.end(false, finish)
+      } catch {
+        finish()
+      }
+    })
+    return this.#closePromise
+  }
+
   publishEvent(type: EventType, payload: SafePayload | undefined): void {
     if (
+      this.#closed ||
       this.#client === undefined ||
       this.#diagnostics.connectionState !== 'connected' ||
       this.#settings.eventModes[type] === 'OFF' ||

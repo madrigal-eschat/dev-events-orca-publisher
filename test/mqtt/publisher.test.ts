@@ -52,6 +52,16 @@ class FakeClient implements MqttClientLike {
     this.published.push({ topic, message, qos: options.qos, callback })
   }
 
+  end(force: boolean, callback: (error?: Error | null) => void): this {
+    this.endCalls.push({ force, callback })
+    return this
+  }
+
+  readonly endCalls: Array<{
+    force: boolean
+    callback: (error?: Error | null) => void
+  }> = []
+
   emit(event: 'connect' | 'reconnect' | 'close'): void {
     for (const listener of this.listeners[event]) {
       listener()
@@ -109,6 +119,39 @@ describe('asynchronous MQTT publishing', () => {
     publisher.publishEvent('devevents.file.closed', { data: {} })
 
     expect(client.published).toHaveLength(0)
+  })
+
+  test('closes gracefully once and does not publish after closing', async () => {
+    const { publisher, client } = createPublisher('devevents.file.saved', { connected: true })
+
+    const firstClose = publisher.close()
+    const secondClose = publisher.close()
+    expect(client.endCalls).toHaveLength(1)
+    expect(client.endCalls[0]?.force).toBe(false)
+    publisher.publishEvent('devevents.file.saved', { data: {} })
+    expect(client.published).toHaveLength(0)
+
+    let closed = false
+    void firstClose.then(() => {
+      closed = true
+    })
+    await Promise.resolve()
+    expect(closed).toBe(false)
+    client.endCalls[0]?.callback()
+    client.endCalls[0]?.callback()
+    await expect(firstClose).resolves.toBeUndefined()
+    await expect(secondClose).resolves.toBeUndefined()
+    expect(closed).toBe(true)
+  })
+
+  test('settles shutdown if the client throws while ending', async () => {
+    const { publisher, client } = createPublisher('devevents.file.saved', { connected: true })
+    vi.spyOn(client, 'end').mockImplementationOnce(() => {
+      throw new Error('Synchronous client end failure')
+    })
+
+    await expect(publisher.close()).resolves.toBeUndefined()
+    expect(publisher.diagnostics.connectionState).toBe('disconnected')
   })
 
   test('publishes enabled messages at QoS 0 to the configured topic without waiting', () => {
@@ -267,7 +310,7 @@ describe('asynchronous MQTT publishing', () => {
     })
   })
 
-  test('records synchronous connection and publish failures', () => {
+  test('records synchronous connection and publish failures', async () => {
     const settings = createDefaultSettings('client-id')
     const connectionFailure = new MqttPublisher({
       settings,
@@ -281,6 +324,8 @@ describe('asynchronous MQTT publishing', () => {
       lastError: 'connection_failed'
     })
     expect(() => connectionFailure.publishEvent('devevents.file.saved', { data: {} })).not.toThrow()
+
+    await expect(connectionFailure.close()).resolves.toBeUndefined()
 
     const { publisher, client } = createPublisher('devevents.file.saved', { connected: true })
     client.throwOnPublish = new Error('synchronous publish failed')
