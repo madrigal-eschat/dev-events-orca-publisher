@@ -53,6 +53,8 @@ test('activates the publisher and forwards only mapped agent turn events', async
       set: vi.fn()
     },
     secrets: { get: vi.fn().mockResolvedValue(null) },
+    log: vi.fn(),
+    host: { call: vi.fn().mockResolvedValue({ ok: true }) },
     events: {
       on: vi.fn((event: string, handler: (payload: unknown) => void) => {
         handlers.set(event, handler)
@@ -74,6 +76,15 @@ test('activates the publisher and forwards only mapped agent turn events', async
   })
 
   expect(Array.from(handlers.keys())).toEqual(['agent.status.changed'])
+  expect(orca.log).toHaveBeenCalledWith('MQTT connection state: connecting')
+  expect(orca.log).toHaveBeenCalledWith('MQTT connection state: connected')
+  expect(orca.host.call).toHaveBeenCalledWith('statusBar.update', {
+    id: 'mqtt-status',
+    text: 'MQTT: Connected',
+    icon: 'plug',
+    tone: 'success',
+    tooltip: 'MQTT connection state: connected'
+  })
   expect(client.published).toHaveLength(1)
   expect(JSON.parse(client.published[0]?.message ?? '')).toMatchObject({
     type: 'devevents.agent.turn.started',
