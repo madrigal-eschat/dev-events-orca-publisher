@@ -1,0 +1,197 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["specversion", "id", "type", "source", "sourcetype", "time", "data"],
+  "properties": {
+    "specversion": { "const": "1.0" },
+    "id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "type": { "type": "string" },
+    "source": { "type": "string", "pattern": "^editor/[^/]+/orca$" },
+    "sourcetype": { "const": "editor" },
+    "subject": { "type": "string" },
+    "time": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+    },
+    "data": { "type": "object" }
+  },
+  "additionalProperties": false,
+  "oneOf": [
+    {
+      "properties": {
+        "type": { "const": "devevents.task.started" },
+        "data": { "$ref": "#/definitions/taskStarted" }
+      }
+    },
+    {
+      "properties": {
+        "type": { "const": "devevents.task.succeeded" },
+        "data": { "$ref": "#/definitions/taskSucceeded" }
+      }
+    },
+    {
+      "properties": {
+        "type": { "const": "devevents.task.failed" },
+        "data": { "$ref": "#/definitions/taskFailed" }
+      }
+    },
+    {
+      "properties": {
+        "type": { "const": "devevents.test.started" },
+        "data": { "$ref": "#/definitions/emptyData" }
+      }
+    },
+    {
+      "properties": {
+        "type": { "enum": ["devevents.test.succeeded", "devevents.test.failed"] },
+        "data": { "$ref": "#/definitions/testCompleted" }
+      }
+    },
+    {
+      "properties": {
+        "type": {
+          "enum": ["devevents.file.saved", "devevents.file.opened", "devevents.file.closed"]
+        },
+        "data": { "$ref": "#/definitions/fileEvent" }
+      }
+    },
+    {
+      "properties": {
+        "type": { "const": "devevents.breakpoint.hit" },
+        "data": { "$ref": "#/definitions/breakpoint" }
+      }
+    },
+    {
+      "properties": {
+        "type": { "enum": ["devevents.vcs.committed", "devevents.vcs.pushed"] },
+        "data": { "$ref": "#/definitions/emptyData" }
+      }
+    },
+    {
+      "properties": {
+        "type": { "const": "devevents.vcs.branch.changed" },
+        "data": { "$ref": "#/definitions/branchChanged" }
+      }
+    },
+    {
+      "properties": {
+        "type": {
+          "enum": ["devevents.editor.focus.gained", "devevents.editor.focus.lost"]
+        },
+        "data": { "$ref": "#/definitions/emptyData" }
+      }
+    },
+    {
+      "properties": {
+        "type": { "const": "devevents.keypresses" },
+        "data": { "$ref": "#/definitions/keypresses" }
+      }
+    },
+    {
+      "properties": {
+        "type": {
+          "enum": [
+            "devevents.agent.started",
+            "devevents.agent.turn.started",
+            "devevents.agent.exited"
+          ]
+        },
+        "data": { "$ref": "#/definitions/agent" }
+      }
+    },
+    {
+      "properties": {
+        "type": { "const": "devevents.agent.turn.ended" },
+        "data": { "$ref": "#/definitions/agentTurnEnded" }
+      }
+    }
+  ],
+  "definitions": {
+    "emptyData": {
+      "type": "object",
+      "additionalProperties": false
+    },
+    "taskStarted": {
+      "type": "object",
+      "properties": { "name": { "type": "string" } },
+      "additionalProperties": false
+    },
+    "taskSucceeded": {
+      "type": "object",
+      "required": ["duration_ms"],
+      "properties": {
+        "duration_ms": { "type": "integer", "minimum": 0 },
+        "name": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "taskFailed": {
+      "type": "object",
+      "required": ["duration_ms"],
+      "properties": {
+        "duration_ms": { "type": "integer", "minimum": 0 },
+        "name": { "type": "string" },
+        "exit_code": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
+    "testCompleted": {
+      "type": "object",
+      "required": ["duration_ms", "passed", "failed", "skipped"],
+      "properties": {
+        "duration_ms": { "type": "integer", "minimum": 0 },
+        "passed": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 },
+        "skipped": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "fileEvent": {
+      "type": "object",
+      "properties": { "file_path": { "type": "string" } },
+      "additionalProperties": false
+    },
+    "breakpoint": {
+      "type": "object",
+      "properties": {
+        "file_path": { "type": "string" },
+        "line": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "branchChanged": {
+      "type": "object",
+      "properties": { "branch": { "type": "string" } },
+      "additionalProperties": false
+    },
+    "keypresses": {
+      "type": "object",
+      "required": ["count"],
+      "properties": { "count": { "type": "integer", "minimum": 0 } },
+      "additionalProperties": false
+    },
+    "agent": {
+      "type": "object",
+      "properties": {
+        "agent": { "type": "string" },
+        "session": { "type": "string" },
+        "worktree": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "agentTurnEnded": {
+      "type": "object",
+      "required": ["reason"],
+      "properties": {
+        "agent": { "type": "string" },
+        "session": { "type": "string" },
+        "worktree": { "type": "string" },
+        "reason": { "enum": ["waiting", "interrupted", "finished", "failed"] }
+      },
+      "additionalProperties": false
+    }
+  }
+}
