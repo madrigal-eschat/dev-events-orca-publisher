@@ -9,5 +9,5 @@
     "verbatimModuleSyntax": true,
     "types": ["node"]
   },
-  "include": ["src/**/*.ts", ".orca/types/*.d.ts"]
+  "include": ["src/**/*.ts", "test/orca/**/*.ts", ".orca/types/*.d.ts"]
 }

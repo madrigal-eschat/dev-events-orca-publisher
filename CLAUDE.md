@@ -7,6 +7,10 @@ Compare changed executable lines with `origin/main` using
 For real MQTT delivery, run `./scripts/integration-test.sh` or set
 `MQTT_INTEGRATION_URL` to a throwaway loopback Mosquitto broker.
 
+Put test files under `test/` and group them by subsystem. Use `test/orca/`
+for worker startup, publisher lifecycle, and panel tests. The panel test uses
+`orca/testing`, so Vitest excludes it and Orca's test runner executes it.
+
 Run `orca plugin validate .`, `orca plugin check .`, and `orca plugin test .`
 locally. The Orca test runner includes the MQTT Password panel tests. Run
 `orca plugin dev watch .` for development and see `orca plugin dev emit --help`

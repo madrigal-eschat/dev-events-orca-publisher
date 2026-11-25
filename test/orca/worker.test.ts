@@ -1,10 +1,10 @@
 import type { OrcaWorkerApi } from 'orca/worker'
 import { expect, test, vi } from 'vitest'
-import { activatePublisher } from './index'
-import activate, { deactivate } from './worker'
+import { activatePublisher } from '../../src/index'
+import activate, { deactivate } from '../../src/worker'
 
 const { cleanup } = vi.hoisted(() => ({ cleanup: vi.fn().mockResolvedValue(undefined) }))
-vi.mock('./index', () => ({ activatePublisher: vi.fn().mockResolvedValue(cleanup) }))
+vi.mock('../../src/index', () => ({ activatePublisher: vi.fn().mockResolvedValue(cleanup) }))
 
 test('passes the Orca worker API to publisher activation', async () => {
   const orca = {} as OrcaWorkerApi
