@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  node:
+    name: Node CI
+    permissions:
+      contents: read
+    uses: madrigal-eschat/ci-workflows/.github/workflows/_node-ci.yml@901ba5472928a008524b102bfbdd2fb98637aef2 # v1.2.0
+    with:
+      diff-coverage: true
+      base-ref: ${{ github.base_ref || 'main' }}
+
+  gitleaks:
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: madrigal-eschat/ci-workflows/.github/workflows/_gitleaks.yml@901ba5472928a008524b102bfbdd2fb98637aef2 # v1.2.0
+
+  commitlint:
+    permissions:
+      contents: read
+    uses: madrigal-eschat/ci-workflows/.github/workflows/_commitlint.yml@901ba5472928a008524b102bfbdd2fb98637aef2 # v1.2.0
+    with:
+      from-sha: ${{ github.event.pull_request.base.sha || github.event.before }}
+      to-sha: ${{ github.event.pull_request.head.sha || github.sha }}
+
+  markdown-lint:
+    permissions:
+      contents: read
+    uses: madrigal-eschat/ci-workflows/.github/workflows/_markdown-lint.yml@901ba5472928a008524b102bfbdd2fb98637aef2 # v1.2.0
+    with:
+      files: README.md
+
+  prose-lint:
+    permissions:
+      contents: read
+    uses: madrigal-eschat/ci-workflows/.github/workflows/_prose-lint.yml@901ba5472928a008524b102bfbdd2fb98637aef2 # v1.2.0
+    with:
+      files: README.md
