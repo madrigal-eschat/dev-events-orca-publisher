@@ -42,3 +42,11 @@ jobs:
     uses: madrigal-eschat/ci-workflows/.github/workflows/_prose-lint.yml@901ba5472928a008524b102bfbdd2fb98637aef2 # v1.2.0
     with:
       files: README.md
+
+  semantic-release:
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    uses: madrigal-eschat/ci-workflows/.github/workflows/_semrel.yml@901ba5472928a008524b102bfbdd2fb98637aef2 # v1.2.0
