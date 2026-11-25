@@ -2,7 +2,7 @@
   "manifestVersion": 2,
   "id": "dev-events-orca-publisher",
   "name": "dev-events Orca Publisher",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Publishes privacy-safe Orca agent turn activity as dev-events MQTT messages.",
   "engines": {
     "orca": ">=1.4.248"

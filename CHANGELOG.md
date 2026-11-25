@@ -1,3 +1,10 @@
+## [1.0.2](https://github.com/madrigal-eschat/dev-events-orca-publisher/compare/v1.0.1...v1.0.2) (2026-11-25)
+
+
+### Bug Fixes
+
+* log MQTT connection attempts and safe failure reasons ([3e1f954](https://github.com/madrigal-eschat/dev-events-orca-publisher/commit/3e1f95436d0be14788147b94f4f307a47081a6dc))
+
 ## [1.0.1](https://github.com/madrigal-eschat/dev-events-orca-publisher/compare/v1.0.0...v1.0.1) (2026-11-25)
 
 
