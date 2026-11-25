@@ -9,5 +9,6 @@
   },
   "execution": "trusted-worker",
   "pluginApi": 1,
+  "capabilities": [{ "kind": "storage:own" }, { "kind": "secrets:own" }],
   "main": "src/worker.ts"
 }
