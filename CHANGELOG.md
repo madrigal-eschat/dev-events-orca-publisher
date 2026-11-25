@@ -1,3 +1,10 @@
+## [1.0.1](https://github.com/madrigal-eschat/dev-events-orca-publisher/compare/v1.0.0...v1.0.1) (2026-11-25)
+
+
+### Bug Fixes
+
+* **lint:** ignore generated CHANGELOG.md in biome ([6b4913a](https://github.com/madrigal-eschat/dev-events-orca-publisher/commit/6b4913a611c4c26fbc30e2d67ed93f796efa213e))
+
 # 1.0.0 (2026-11-25)
 
 
