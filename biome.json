@@ -3,7 +3,14 @@
     "enabled": false
   },
   "files": {
-    "includes": ["**", "!**/.orca", "!**/coverage", "!**/node_modules", "!**/docs/superpowers"]
+    "includes": [
+      "**",
+      "!**/.orca",
+      "!**/coverage",
+      "!**/node_modules",
+      "!**/docs/superpowers",
+      "!CHANGELOG.md"
+    ]
   },
   "formatter": {
     "enabled": true,
