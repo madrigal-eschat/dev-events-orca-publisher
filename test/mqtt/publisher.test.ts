@@ -310,6 +310,27 @@ describe('asynchronous MQTT publishing', () => {
     })
   })
 
+  test.each([
+    [
+      Object.assign(new Error('private broker address'), { code: 'ECONNREFUSED' }),
+      'connection_refused'
+    ],
+    [
+      Object.assign(new Error('private broker hostname'), { code: 'ENOTFOUND' }),
+      'broker_dns_failed'
+    ],
+    [Object.assign(new Error('private credentials'), { code: 4 }), 'broker_auth_failed'],
+    [new Error('connack timeout'), 'broker_handshake_timeout'],
+    [
+      Object.assign(new Error('private broker details'), { code: 'PRIVATE_TOKEN' }),
+      'connection_failed'
+    ]
+  ])('reports an allowlisted connection failure reason for %s', (error, reason) => {
+    const { publisher, client } = createPublisher('devevents.file.saved')
+    client.emitError(error)
+    expect(publisher.diagnostics).toEqual({ connectionState: 'error', lastError: reason })
+  })
+
   test('records synchronous connection and publish failures', async () => {
     const settings = createDefaultSettings('client-id')
     const connectionFailure = new MqttPublisher({

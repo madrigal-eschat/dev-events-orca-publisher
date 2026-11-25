@@ -49,7 +49,11 @@ Changing a setting reconnects the publisher with the updated configuration.
 The plugin warns at startup when both supported event modes are `OFF`.
 The **MQTT** status bar item shows the connection state. Its tooltip shows the
 latest error code when present. Orca's plugin logs record connection state
-changes and error codes.
+changes and a diagnostic code whenever a connection attempt ends in an error. For
+example, `connection_refused` means the broker's TCP port refused the connection,
+and `broker_auth_failed` means the broker rejected authentication or authorization.
+The logs show the broker scheme, hostname, and any explicit port on each
+connection attempt, and indicate when the attempt uses configured credentials.
 
 A blank home subnet permits publishing on any network. With `Include host`
 enabled, the default topic is `dev-events/<host>`. Turning it off publishes to

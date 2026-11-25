@@ -31,6 +31,27 @@ describe('publisher status reporting', () => {
     })
   })
 
+  test('logs the reason on each failed reconnect without logging duplicate snapshots', () => {
+    const log = vi.fn<(message: string) => void>()
+    const report = createStatusReporter(log, vi.fn())
+    const failure = { connectionState: 'error', lastError: 'connection_refused' } as const
+
+    report(failure)
+    report(failure)
+    report({ ...failure, connectionState: 'disconnected' })
+    report({ ...failure, connectionState: 'connecting' })
+    report(failure)
+
+    expect(log.mock.calls.flat()).toEqual([
+      'MQTT connection state: error',
+      'MQTT latest error: connection_refused',
+      'MQTT connection state: disconnected',
+      'MQTT connection state: connecting',
+      'MQTT connection state: error',
+      'MQTT latest error: connection_refused'
+    ])
+  })
+
   test('never reports arbitrary diagnostic text or private values', () => {
     const log = vi.fn<(message: string) => void>()
     const updateStatusBar = vi.fn()
