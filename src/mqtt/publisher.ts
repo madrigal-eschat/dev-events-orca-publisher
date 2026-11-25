@@ -3,6 +3,7 @@ import { hostname, type NetworkInterfaceInfo, networkInterfaces } from 'node:os'
 import { connect as mqttConnect } from 'mqtt'
 import type { SafePayload } from '../privacy/payload'
 import type { EventType, PublisherSettings } from '../settings/settings'
+import { connectionFailure } from '../status'
 import { buildEnvelope, buildTopic } from './envelope'
 
 export type MqttConnectionOptions = {
@@ -38,6 +39,7 @@ type PublisherOptions = {
   connect?: MqttConnect
   now?: () => Date
   id?: () => string
+  log?: (message: string) => void
   onDiagnostics?: (diagnostics: PublisherDiagnostics) => void
 }
 
@@ -103,15 +105,37 @@ export class MqttPublisher {
       connectionOptions.password = options.password
     }
 
+    const logConnectionAttempt = (): void => {
+      const log = options.log
+      if (log === undefined) {
+        return
+      }
+      try {
+        const { protocol, host } = new URL(this.#settings.brokerUrl)
+        log(`MQTT connection attempt: ${protocol}//${host}`)
+        if (connectionOptions.username !== undefined || connectionOptions.password !== undefined) {
+          log('MQTT login attempt: using configured credentials')
+        }
+      } catch {
+        // Diagnostics must not interrupt MQTT connection attempts.
+      }
+    }
+
+    logConnectionAttempt()
     try {
       const connect = options.connect ?? ((url, connectOptions) => mqttConnect(url, connectOptions))
       this.#client = connect(this.#settings.brokerUrl, connectionOptions)
       this.#client.on('connect', () => this.#updateDiagnostics('connected'))
-      this.#client.on('reconnect', () => this.#updateDiagnostics('connecting'))
+      this.#client.on('reconnect', () => {
+        logConnectionAttempt()
+        this.#updateDiagnostics('connecting')
+      })
       this.#client.on('close', () => this.#updateDiagnostics('disconnected'))
-      this.#client.on('error', () => this.#updateDiagnostics('error', 'connection_failed'))
-    } catch {
-      this.#updateDiagnostics('error', 'connection_failed')
+      this.#client.on('error', (error) =>
+        this.#updateDiagnostics('error', connectionFailure(error))
+      )
+    } catch (error) {
+      this.#updateDiagnostics('error', connectionFailure(error))
     }
   }
 

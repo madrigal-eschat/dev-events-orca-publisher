@@ -137,6 +137,39 @@ beforeEach(() => {
   vi.mocked(mqttConnect).mockReset()
 })
 
+test('logs the broker address and login attempts on connect and reconnect without credentials', async () => {
+  const activation = createActivation({
+    brokerUrl: 'wss://broker.example:9443/mqtt?token=private-query',
+    username: 'private-username'
+  })
+  const cleanup = await activatePublisher(activation.orca)
+  activation.clients[0]?.emit('reconnect')
+
+  expect(activation.log.mock.calls.flat().filter((message) => message.includes('attempt'))).toEqual(
+    [
+      'MQTT connection attempt: wss://broker.example:9443',
+      'MQTT login attempt: using configured credentials',
+      'MQTT connection attempt: wss://broker.example:9443',
+      'MQTT login attempt: using configured credentials'
+    ]
+  )
+  expect(JSON.stringify(activation.log.mock.calls)).not.toMatch(
+    /private-query|private-username|broker-secret/
+  )
+  await cleanup()
+})
+
+test('logs a broker address without a login attempt when no credentials are configured', async () => {
+  const activation = createActivation()
+  activation.secrets.get.mockResolvedValue('')
+  const cleanup = await activatePublisher(activation.orca)
+
+  expect(activation.log.mock.calls.flat().filter((message) => message.includes('attempt'))).toEqual(
+    ['MQTT connection attempt: tcp://localhost:1883']
+  )
+  await cleanup()
+})
+
 test('loads Orca settings and password, replacing the publisher on settings changes', async () => {
   const activation = createActivation()
 

@@ -54,6 +54,7 @@ export async function activatePublisher(orca: OrcaWorkerApi): Promise<() => Prom
       currentPublisher = new MqttPublisher({
         settings,
         password: password ?? undefined,
+        log,
         onDiagnostics: reportStatus
       })
     } catch {

@@ -1,4 +1,5 @@
 import { allEventsOff, type PublisherSettings } from './settings/settings'
+import { isRecord } from './util/is-record'
 
 export type DiagnosticSnapshot = {
   connectionState: 'connecting' | 'connected' | 'disconnected' | 'error'
@@ -15,12 +16,43 @@ type StatusBarUpdate = {
 
 type StatusBarUpdater = (update: StatusBarUpdate) => undefined | Promise<unknown>
 
+const CONNECTION_FAILURES = new Map<unknown, string>([
+  ['ECONNREFUSED', 'connection_refused'],
+  ['ECONNRESET', 'connection_reset'],
+  ['ENOTFOUND', 'broker_dns_failed'],
+  ['EAI_AGAIN', 'broker_dns_failed'],
+  ['ETIMEDOUT', 'connection_timeout'],
+  ['ENETUNREACH', 'broker_unreachable'],
+  ['EHOSTUNREACH', 'broker_unreachable'],
+  ['CERT_HAS_EXPIRED', 'broker_tls_validation_failed'],
+  ['DEPTH_ZERO_SELF_SIGNED_CERT', 'broker_tls_validation_failed'],
+  ['SELF_SIGNED_CERT_IN_CHAIN', 'broker_tls_validation_failed'],
+  ['UNABLE_TO_VERIFY_LEAF_SIGNATURE', 'broker_tls_validation_failed'],
+  ['ERR_TLS_CERT_ALTNAME_INVALID', 'broker_tls_validation_failed'],
+  [4, 'broker_auth_failed'],
+  [5, 'broker_auth_failed'],
+  [134, 'broker_auth_failed'],
+  [135, 'broker_auth_failed']
+])
+
 const SAFE_ERRORS = new Set([
+  ...CONNECTION_FAILURES.values(),
+  'broker_handshake_timeout',
   'connection_failed',
   'publish_failed',
   'invalid_home_subnet',
   'mqtt_error'
 ])
+
+export function connectionFailure(error: unknown): string {
+  if (!isRecord(error)) {
+    return 'connection_failed'
+  }
+  if (error.message === 'connack timeout') {
+    return 'broker_handshake_timeout'
+  }
+  return CONNECTION_FAILURES.get(error.code) ?? 'connection_failed'
+}
 
 function safeState(value: string): DiagnosticSnapshot['connectionState'] {
   switch (value) {
@@ -74,6 +106,7 @@ export function createStatusReporter(
   return (diagnostics) => {
     const connectionState = safeState(diagnostics.connectionState)
     const lastError = safeError(diagnostics.lastError)
+    const enteredError = connectionState === 'error' && previousState !== 'error'
 
     if (connectionState !== previousState) {
       try {
@@ -84,7 +117,7 @@ export function createStatusReporter(
       previousState = connectionState
     }
 
-    if (lastError !== null && lastError !== previousError) {
+    if (lastError !== null && (lastError !== previousError || enteredError)) {
       try {
         log(`MQTT latest error: ${lastError}`)
       } catch {
