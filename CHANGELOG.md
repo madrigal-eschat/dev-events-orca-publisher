@@ -1,3 +1,10 @@
+## [1.0.3](https://github.com/madrigal-eschat/dev-events-orca-publisher/compare/v1.0.2...v1.0.3) (2026-11-26)
+
+
+### Bug Fixes
+
+* bundle worker dependencies for git installs ([8512d6e](https://github.com/madrigal-eschat/dev-events-orca-publisher/commit/8512d6e76ba9017d97610f832591bd33d2a3c0e2))
+
 ## [1.0.2](https://github.com/madrigal-eschat/dev-events-orca-publisher/compare/v1.0.1...v1.0.2) (2026-11-25)
 
 
