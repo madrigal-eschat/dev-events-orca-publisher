@@ -124,7 +124,7 @@ Continuous integration (CI) runs two bundle checks:
 - The freshness check rebuilds the bundle and fails if `dist/` differs from the
   committed copy.
 - `npm run smoke` copies only the files Git tracks to an empty directory, imports
-  the manifest's `main` without installing packages, and rejects static imports
+  the manifest's `main` without installing packages, and fails on static imports
   other than Node built-ins and `orca`. It substitutes an empty stub for `orca`.
   Stage new files before running it.
 
