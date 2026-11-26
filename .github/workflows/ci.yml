@@ -49,4 +49,7 @@ jobs:
       contents: write
       issues: write
       pull-requests: write
+    concurrency:
+      group: semantic-release
+      cancel-in-progress: false
     uses: madrigal-eschat/ci-workflows/.github/workflows/_semrel.yml@901ba5472928a008524b102bfbdd2fb98637aef2 # v1.2.0
