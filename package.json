@@ -12,7 +12,8 @@
     "test": "vitest run",
     "orca:validate": "orca plugin validate .",
     "orca:check": "orca plugin check .",
-    "orca:test": "orca plugin test ."
+    "orca:test": "orca plugin test .",
+    "build": "esbuild src/worker.ts --bundle --platform=node --target=node26 --format=esm --outfile=dist/worker.js --external:orca --external:'orca/*' --banner:js=\"import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);\""
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.8",
@@ -27,6 +28,7 @@
     "@types/node": "26.6.6",
     "@vitest/coverage-v8": "5.1.1",
     "ajv": "8.20.0",
+    "esbuild": "0.28.2",
     "semantic-release": "26.0.1",
     "typescript": "7.0.2",
     "vitest": "5.1.1"
