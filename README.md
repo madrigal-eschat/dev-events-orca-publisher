@@ -6,9 +6,11 @@ The Orca plugin publishes confirmed agent turn lifecycle events as CloudEvents
 
 ## Install
 
-Clone this repository, then run `npm ci` and `orca plugin install .` from the
-checkout. Review Orca's capability prompt before approving the plugin. To work
-on the plugin locally, run `orca plugin dev watch .`.
+Install the plugin from this repository's Git URL, or clone it and run
+`orca plugin install .` from the checkout. Neither needs an npm step, because the
+repository includes the bundled worker. Review Orca's capability prompt before
+approving the plugin. To work on the plugin locally, see
+[Worker bundle](#worker-bundle).
 
 ## Confirmed mapping
 
@@ -103,6 +105,33 @@ allowlisted reason is not sensitive.
 
 No workspace capability is requested because no workspace event is used to
 construct a published message.
+
+## Worker bundle
+
+Orca installs a plugin from its committed files and runs neither a build nor
+`npm install`. For that reason, the repository commits `dist/worker.js`, an
+esbuild bundle of `src/worker.ts` and its npm dependencies, and the manifest's
+`main` points to it. Don't edit the bundle by hand.
+
+Run `npm run build` after changing worker source or updating dependencies, and
+commit `dist/` with that change. Orca loads the bundle, so during development run
+`npm run build -- --watch` next to `orca plugin dev watch .`. The MQTT Password
+panel loads straight from `src/panel.ts`, and may import only `orca`, `orca/*`
+and relative files.
+
+Continuous integration (CI) runs two bundle checks:
+
+- The freshness check rebuilds the bundle and fails if `dist/` differs from the
+  committed copy.
+- `npm run smoke` copies only the files Git tracks to an empty directory, imports
+  the manifest's `main` without installing packages, and fails on static imports
+  other than Node built-ins and `orca`. It substitutes an empty stub for `orca`.
+  Stage new files before running it.
+
+Dependabot doesn't rebuild the bundle. Expect the freshness check to fail on a
+Dependabot pull request that changes bundled code, such as an `mqtt` update,
+until someone runs `npm run build` on that branch and commits `dist/`. The same
+applies to an esbuild update that changes the output.
 
 ## Local maintainer checks
 

@@ -15,6 +15,38 @@ jobs:
       diff-coverage: true
       base-ref: ${{ github.base_ref || 'main' }}
 
+  bundle-freshness:
+    name: Bundle freshness
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Fail if the committed bundle is stale
+        run: |
+          git add --intent-to-add dist/
+          git diff --exit-code --stat dist/
+
+  bundle-smoke:
+    name: Bundle smoke test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run smoke
+
   gitleaks:
     permissions:
       contents: read
